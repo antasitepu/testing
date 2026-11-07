@@ -8,7 +8,7 @@ on:
         required: true
       timeframes:
         description: Comma-separated timeframes, one job each
-        default: 5m,15m,1h
+        default: 5m,15m,30m,1h
       max_bars:
         description: Evaluated bars per timeframe (GOLD_BASELINE_MAX_BARS)
         default: "1000000"
@@ -34,7 +34,10 @@ jobs:
           TIMEFRAMES: ${{ inputs.timeframes }}
           MAX_BARS: ${{ inputs.max_bars }}
           CUTOFF_MS: ${{ inputs.cutoff_ms }}
+          RESULTS_AGE_RECIPIENT: ${{ vars.RESULTS_AGE_RECIPIENT }}
         run: |
+          # Results are only ever uploaded encrypted; refuse to run without a recipient.
+          [[ "$RESULTS_AGE_RECIPIENT" == age1* ]] || { echo "RESULTS_AGE_RECIPIENT is not set"; exit 1; }
           [[ "$MAX_BARS" =~ ^[0-9]+$ ]] || { echo "max_bars must be an integer"; exit 1; }
           [[ "$CUTOFF_MS" =~ ^[0-9]+$ ]] || { echo "cutoff_ms must be an integer"; exit 1; }
           (( CUTOFF_MS <= VAULT_END_MS )) || { echo "cutoff_ms passes the vault boundary"; exit 1; }
@@ -123,13 +126,35 @@ jobs:
           GOLD_BASELINE_MAX_BARS: ${{ inputs.max_bars }}
           GOLD_BASELINE_CUTOFF: ${{ inputs.cutoff_ms }}
         run: |
-          set -o pipefail
+          # The log holds results, so it stays off the public job log.
+          status=0
           cargo test --release --locked -p gold-monitoring-server --lib \
-            print_runtime_baseline_from_database -- --ignored --nocapture 2>&1 | tee "baseline-$TIMEFRAME.log"
+            print_runtime_baseline_from_database -- --ignored --nocapture >"baseline-$TIMEFRAME.log" 2>&1 || status=$?
+          grep -vE '^(BASELINE|DATASET)' "baseline-$TIMEFRAME.log" |
+            grep -E '^test result|^error|panicked' | head -n 40 || true
+          exit "$status"
+
+      - name: Encrypt results
+        if: always()
+        env:
+          RESULTS_AGE_RECIPIENT: ${{ vars.RESULTS_AGE_RECIPIENT }}
+          DATASET_TAG: ${{ inputs.dataset_tag }}
+          MAX_BARS: ${{ inputs.max_bars }}
+          CUTOFF_MS: ${{ inputs.cutoff_ms }}
+        run: |
+          [[ -f "baseline-$TIMEFRAME.log" ]] || exit 0
+          command -v age >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq age; }
+          jq -n --arg timeframe "$TIMEFRAME" --arg dataset "$DATASET_TAG" --arg maxBars "$MAX_BARS" \
+            --arg cutoff "$CUTOFF_MS" --arg commit "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" \
+            '{timeframe: $timeframe, datasetTag: $dataset, maxBars: $maxBars, cutoffMs: $cutoff, publicCommit: $commit, runId: $run}' \
+            >"run-info-$TIMEFRAME.json"
+          tar -cf "results-$TIMEFRAME.tar" "baseline-$TIMEFRAME.log" "run-info-$TIMEFRAME.json"
+          age -r "$RESULTS_AGE_RECIPIENT" -o "results-$TIMEFRAME.tar.age" "results-$TIMEFRAME.tar"
+          rm -f "results-$TIMEFRAME.tar" "baseline-$TIMEFRAME.log"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: baseline-${{ matrix.timeframe }}
-          path: baseline-*.log
+          name: results-${{ matrix.timeframe }}
+          path: results-*.tar.age
           if-no-files-found: ignore
