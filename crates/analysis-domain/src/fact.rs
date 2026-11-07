@@ -23,6 +23,7 @@ pub enum FactKind {
     Bollinger,
     ZScore,
     Chandelier,
+    SessionRange,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]

@@ -1,9 +1,10 @@
 use analysis_core::{
-    ConfirmedSwing, DisplacementParameters, RsiPivot, SnapshotBuilder, SnapshotRequest,
-    SwingParameters, calculate_adx, calculate_atr, calculate_bollinger, calculate_chandelier,
-    calculate_ema, calculate_previous_donchian, calculate_rsi, detect_displacements_with_atr,
-    detect_fair_value_gaps, detect_liquidity_pools, detect_liquidity_sweeps,
-    detect_regular_divergence, detect_structure, fvg_lifecycle,
+    ConfirmedSwing, DisplacementParameters, RsiPivot, SessionRangeParameters, SnapshotBuilder,
+    SnapshotRequest, SwingParameters, calculate_adx, calculate_atr, calculate_bollinger,
+    calculate_chandelier, calculate_ema, calculate_previous_donchian, calculate_rsi,
+    detect_displacements_with_atr, detect_fair_value_gaps, detect_liquidity_pools,
+    detect_liquidity_sweeps, detect_regular_divergence, detect_session_ranges, detect_structure,
+    fvg_lifecycle,
 };
 use analysis_domain::{
     AnalysisWorkItem, ConfirmedFact, FactId, FactKind, FactLifecycle, MaterializedProfile,
@@ -22,6 +23,8 @@ use serde_json::{Value, json};
 use std::{collections::HashSet, sync::Arc};
 
 const DEFAULT_BARRIER_GRACE_MS: i64 = 10_000;
+/// Asia opening range, [00:00, 07:00) UTC, for SESSION_BREAKOUT.
+const SESSION_RANGE_RUNTIME_VERSION: &str = "session-range-runtime-v1";
 
 pub struct RuntimeAnalysisCandleSource {
     candles: CandleRepository,
@@ -238,6 +241,7 @@ fn primitive_versions(profile: &MaterializedProfile) -> Vec<PrimitiveVersion> {
                 primitive_version(timeframe, "trend", "trend-runtime-v1"),
                 primitive_version(timeframe, "volatility", "volatility-runtime-v1"),
                 primitive_version(timeframe, "range", "range-runtime-v1"),
+                primitive_version(timeframe, "session", SESSION_RANGE_RUNTIME_VERSION),
             ]
         })
         .collect()
@@ -509,6 +513,18 @@ pub fn build_facts(
                 FactLifecycle::Confirmed,
             )?;
         }
+    }
+    // Appended last so the order of every existing fact is unchanged.
+    let session_version = primitive_version(timeframe, "session", SESSION_RANGE_RUNTIME_VERSION);
+    for (index, range) in
+        detect_session_ranges(candles, &atr_output.values, SessionRangeParameters::ASIA)?
+    {
+        push_fact_id_payload(
+            &mut facts,
+            fact_id(candles, index, FactKind::SessionRange, &session_version)?,
+            &range,
+            FactLifecycle::Confirmed,
+        )?;
     }
     Ok(facts)
 }

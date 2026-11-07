@@ -203,6 +203,38 @@ pub struct MeanReversionParameters {
     pub max_bars_valid: i32,
 }
 
+/// Session Opening Range Breakout (`docs/superpowers/specs/2026-11-07-session-opening-range-breakout-plan-design.md`).
+/// Minutes are measured from 00:00 UTC of the session day.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionBreakoutParameters {
+    pub range_start_minute_utc: i32,
+    pub range_end_minute_utc: i32,
+    pub decision_end_minute_utc: i32,
+    pub time_exit_minute_utc: i32,
+    pub atr_period: i32,
+    pub minimum_normalized_width: Decimal,
+    pub maximum_normalized_width: Decimal,
+    pub target_rr: Decimal,
+    pub minimum_entry_rr: Decimal,
+}
+
+/// Volatility Squeeze Breakout (`docs/superpowers/specs/2026-11-07-volatility-squeeze-breakout-plan-design.md`).
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VolatilitySqueezeParameters {
+    pub bollinger_period: i32,
+    pub bollinger_deviation: Decimal,
+    pub keltner_atr_multiplier: Decimal,
+    pub atr_period: i32,
+    pub minimum_squeeze_bars: i32,
+    pub breakout_window_bars: i32,
+    pub breakout_margin_atr: Decimal,
+    pub stop_buffer_atr: Decimal,
+    pub target_rr: Decimal,
+    pub max_bars_to_tp1: i32,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProfitProtectionParameters {
@@ -314,6 +346,8 @@ pub enum PlanParameters {
     Quasimodo(QuasimodoParameters),
     TrendBreakout(TrendBreakoutParameters),
     MeanReversion(MeanReversionParameters),
+    SessionBreakout(SessionBreakoutParameters),
+    VolatilitySqueeze(VolatilitySqueezeParameters),
 }
 
 impl PlanParameters {
@@ -325,6 +359,8 @@ impl PlanParameters {
             Self::Quasimodo(_) => PlanKind::Quasimodo,
             Self::TrendBreakout(_) => PlanKind::TrendBreakout,
             Self::MeanReversion(_) => PlanKind::MeanReversion,
+            Self::SessionBreakout(_) => PlanKind::SessionBreakout,
+            Self::VolatilitySqueeze(_) => PlanKind::VolatilitySqueeze,
         }
     }
 
@@ -333,7 +369,11 @@ impl PlanParameters {
             Self::Ict(parameters) => parameters.higher_timeframe,
             Self::Smc(parameters) => parameters.higher_timeframe,
             Self::TrendBreakout(parameters) => parameters.higher_timeframe,
-            Self::Rsi(_) | Self::Quasimodo(_) | Self::MeanReversion(_) => None,
+            Self::Rsi(_)
+            | Self::Quasimodo(_)
+            | Self::MeanReversion(_)
+            | Self::SessionBreakout(_)
+            | Self::VolatilitySqueeze(_) => None,
         }
     }
 
@@ -423,6 +463,43 @@ impl PlanParameters {
                     parameters.maximum_bandwidth,
                     parameters.atr_buffer_multiplier,
                     parameters.minimum_rr,
+                ])
+            }
+            Self::SessionBreakout(parameters) => {
+                positive_periods(&[parameters.atr_period])?;
+                if parameters.range_start_minute_utc < 0
+                    || parameters.range_start_minute_utc >= parameters.range_end_minute_utc
+                    || parameters.range_end_minute_utc >= parameters.decision_end_minute_utc
+                    || parameters.decision_end_minute_utc >= parameters.time_exit_minute_utc
+                    || parameters.time_exit_minute_utc > 24 * 60
+                {
+                    return Err(PlanParameterError::InvalidRange);
+                }
+                positive_decimals(&[
+                    parameters.minimum_normalized_width,
+                    parameters.maximum_normalized_width,
+                    parameters.target_rr,
+                    parameters.minimum_entry_rr,
+                ])?;
+                if parameters.minimum_normalized_width >= parameters.maximum_normalized_width {
+                    return Err(PlanParameterError::InvalidRange);
+                }
+                Ok(())
+            }
+            Self::VolatilitySqueeze(parameters) => {
+                positive_periods(&[
+                    parameters.bollinger_period,
+                    parameters.atr_period,
+                    parameters.minimum_squeeze_bars,
+                    parameters.breakout_window_bars,
+                    parameters.max_bars_to_tp1,
+                ])?;
+                positive_decimals(&[
+                    parameters.bollinger_deviation,
+                    parameters.keltner_atr_multiplier,
+                    parameters.breakout_margin_atr,
+                    parameters.stop_buffer_atr,
+                    parameters.target_rr,
                 ])
             }
         }

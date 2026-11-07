@@ -67,7 +67,7 @@ jobs:
           IFS=, read -ra plans <<<"$PLANS"
           for plan in "${plans[@]}"; do
             case "$plan" in
-              ICT | SMC | RSI | QUASIMODO | TREND_BREAKOUT | MEAN_REVERSION) ;;
+              ICT | SMC | RSI | QUASIMODO | TREND_BREAKOUT | MEAN_REVERSION | SESSION_BREAKOUT | VOLATILITY_SQUEEZE) ;;
               *) echo "unknown plan: $plan"; exit 1 ;;
             esac
           done

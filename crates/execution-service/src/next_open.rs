@@ -1,5 +1,7 @@
 use analysis_domain::{PlanKind, SignalDefinition};
-use analysis_plans::{PreEntryRejection, validate_mean_reversion_entry};
+use analysis_plans::{
+    PreEntryRejection, validate_mean_reversion_entry, validate_session_breakout_entry,
+};
 use market_domain::{AggregateTrade, Candle, MarketSession, SessionStatus};
 use rust_decimal::Decimal;
 use std::collections::HashSet;
@@ -32,9 +34,16 @@ impl PendingNextOpen {
                 reason: "canonical open skipped expected open time".to_owned(),
             };
         }
-        if self.signal.plan == PlanKind::MeanReversion
-            && let Err(error) = validate_mean_reversion_entry(&self.signal, candle.open)
-        {
+        let validation = match self.signal.plan {
+            PlanKind::MeanReversion => {
+                Some(validate_mean_reversion_entry(&self.signal, candle.open))
+            }
+            PlanKind::SessionBreakout => {
+                Some(validate_session_breakout_entry(&self.signal, candle.open))
+            }
+            _ => None,
+        };
+        if let Some(Err(error)) = validation {
             return NextOpenDecision::Cancel {
                 reason: PreEntryCancellation::from(error),
             };

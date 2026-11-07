@@ -11,8 +11,9 @@ pub use config::{
     HtfFilterMode, IctFvgSelection, IctParameters, IctSweepBiasMode, MaterializedProfile,
     MeanReversionParameters, PlanParameterError, PlanParameters, PlanProfileKey,
     PositionManagementParameters, ProfitProtectionParameters, QuasimodoParameters, ReleaseMode,
-    RsiPlanParameters, SmcParameters, TrendBreakoutParameters, VersionIdentity,
-    VersionIdentityError, default_rsi_reversal_confirmation_bars,
+    RsiPlanParameters, SessionBreakoutParameters, SmcParameters, TrendBreakoutParameters,
+    VersionIdentity, VersionIdentityError, VolatilitySqueezeParameters,
+    default_rsi_reversal_confirmation_bars,
 };
 pub use fact::{
     ConfirmedFact, EvidenceRef, FactId, FactKind, FactLifecycle, PrimitiveVersion, ReferenceLevel,

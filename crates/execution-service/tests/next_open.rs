@@ -568,3 +568,27 @@ fn regular_session() -> MarketSession {
 fn symbol() -> Symbol {
     Symbol::new("XAUUSDT").unwrap()
 }
+
+#[test]
+fn session_breakout_cancels_like_the_backtest() {
+    // Stop 4090, target 4130 (see `signal`).
+    let cases = [
+        (4_090, Some(PreEntryCancellation::StopCrossed)),
+        (4_130, Some(PreEntryCancellation::TargetCrossed)),
+        (4_112, Some(PreEntryCancellation::InsufficientRiskReward)),
+        (4_105, None),
+    ];
+    for (open, expected) in cases {
+        let pending = pending(PlanKind::SessionBreakout, 60_000, Vec::new());
+        let decision = pending.decide(&candle(60_000, open), Some(&regular_session()));
+        match expected {
+            Some(reason) => {
+                assert_eq!(decision, NextOpenDecision::Cancel { reason }, "open {open}")
+            }
+            None => assert!(
+                matches!(decision, NextOpenDecision::Enter { .. }),
+                "open {open}"
+            ),
+        }
+    }
+}

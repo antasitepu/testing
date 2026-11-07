@@ -216,6 +216,8 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
             | "MEAN_REVERSION-runtime-v3"
             | "TREND_BREAKOUT-runtime-v3"
             | "TREND_BREAKOUT-runtime-v4"
+            | "squeeze-v1"
+            | "VOLATILITY_SQUEEZE-runtime-v1"
     )
 }
 
@@ -1002,10 +1004,12 @@ fn management_reason_prefix(plan: PlanKind) -> &'static str {
         PlanKind::Quasimodo => "QM",
         PlanKind::TrendBreakout => "TREND",
         PlanKind::MeanReversion => "MEAN",
+        PlanKind::SessionBreakout => "ORB",
+        PlanKind::VolatilitySqueeze => "SQUEEZE",
     }
 }
 
-fn management_directive(
+pub(crate) fn management_directive(
     state: &PlanRuntimeState,
     signal: &SignalDefinition,
     evaluated: i64,
@@ -1299,6 +1303,11 @@ mod tests {
         assert_eq!(management_reason_prefix(PlanKind::Quasimodo), "QM");
         assert_eq!(management_reason_prefix(PlanKind::TrendBreakout), "TREND");
         assert_eq!(management_reason_prefix(PlanKind::MeanReversion), "MEAN");
+        assert_eq!(management_reason_prefix(PlanKind::SessionBreakout), "ORB");
+        assert_eq!(
+            management_reason_prefix(PlanKind::VolatilitySqueeze),
+            "SQUEEZE"
+        );
     }
 
     #[test]

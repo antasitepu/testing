@@ -150,6 +150,8 @@ fn parse_plan(value: &str) -> Result<PlanKind, AnalysisApiError> {
         "QUASIMODO" => Ok(PlanKind::Quasimodo),
         "TREND_BREAKOUT" => Ok(PlanKind::TrendBreakout),
         "MEAN_REVERSION" => Ok(PlanKind::MeanReversion),
+        "SESSION_BREAKOUT" => Ok(PlanKind::SessionBreakout),
+        "VOLATILITY_SQUEEZE" => Ok(PlanKind::VolatilitySqueeze),
         _ => Err(AnalysisApiError::invalid("unknown plan")),
     }
 }

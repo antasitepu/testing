@@ -74,13 +74,16 @@ fn simultaneous_close_is_arrival_order_independent_and_canonical() {
     reversed.reverse();
     let descending = run_order(&reversed);
     assert_eq!(ascending, descending);
-    assert_eq!(ascending.len(), 42);
+    assert_eq!(ascending.len(), PlanKind::ALL.len() * Timeframe::ALL.len());
 
     let expected_prefix: Vec<_> = PlanKind::ALL
         .into_iter()
         .map(|plan| (Timeframe::D1, plan))
         .collect();
-    assert_eq!(&ascending[..6], expected_prefix.as_slice());
+    assert_eq!(
+        &ascending[..PlanKind::ALL.len()],
+        expected_prefix.as_slice()
+    );
 }
 
 #[test]

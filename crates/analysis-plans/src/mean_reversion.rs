@@ -76,6 +76,15 @@ pub fn validate_mean_reversion_entry(
     if signal.plan != PlanKind::MeanReversion {
         return Err(PreEntryRejection::WrongPlan);
     }
+    check_pre_entry(signal, actual_open)
+}
+
+/// The next-open checks carried by `pre_entry_validation`, shared by every plan
+/// that publishes one. Callers check the plan first.
+pub(crate) fn check_pre_entry(
+    signal: &SignalDefinition,
+    actual_open: Decimal,
+) -> Result<Decimal, PreEntryRejection> {
     let Some(validation) = &signal.pre_entry_validation else {
         return Err(PreEntryRejection::MissingValidation);
     };

@@ -13,16 +13,20 @@ pub enum PlanKind {
     Quasimodo,
     TrendBreakout,
     MeanReversion,
+    SessionBreakout,
+    VolatilitySqueeze,
 }
 
 impl PlanKind {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 8] = [
         Self::Ict,
         Self::Smc,
         Self::Rsi,
         Self::Quasimodo,
         Self::TrendBreakout,
         Self::MeanReversion,
+        Self::SessionBreakout,
+        Self::VolatilitySqueeze,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -33,6 +37,8 @@ impl PlanKind {
             Self::Quasimodo => "QUASIMODO",
             Self::TrendBreakout => "TREND_BREAKOUT",
             Self::MeanReversion => "MEAN_REVERSION",
+            Self::SessionBreakout => "SESSION_BREAKOUT",
+            Self::VolatilitySqueeze => "VOLATILITY_SQUEEZE",
         }
     }
 }

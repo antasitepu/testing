@@ -78,9 +78,28 @@ fn runtime_profile_contract_matches_fixture() {
 }
 
 #[test]
+fn research_plans_are_disabled_in_production() {
+    let catalog = RuntimeProfileCatalog::current().unwrap();
+    for entry in catalog.entries() {
+        let research = matches!(
+            entry.plan,
+            PlanKind::SessionBreakout | PlanKind::VolatilitySqueeze
+        );
+        assert_eq!(
+            entry.enabled, !research,
+            "{:?} {:?}",
+            entry.plan, entry.timeframe
+        );
+        if entry.plan == PlanKind::SessionBreakout {
+            assert!(entry.required_timeframes.is_empty());
+        }
+    }
+}
+
+#[test]
 fn runtime_profile_catalog_contains_exactly_one_profile_per_plan_and_timeframe() {
     let catalog = RuntimeProfileCatalog::current().unwrap();
-    assert_eq!(catalog.entries().len(), 42);
+    assert_eq!(catalog.entries().len(), 56);
     catalog.validate().unwrap();
 }
 

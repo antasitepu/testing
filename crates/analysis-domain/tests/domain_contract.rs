@@ -486,7 +486,7 @@ fn signal_execution_geometry_covers_entry_selection_and_compatibility_paths() {
 }
 
 #[test]
-fn all_six_plans_have_stable_order() {
+fn all_plans_have_stable_order() {
     assert_eq!(
         PlanKind::ALL,
         [
@@ -496,6 +496,8 @@ fn all_six_plans_have_stable_order() {
             PlanKind::Quasimodo,
             PlanKind::TrendBreakout,
             PlanKind::MeanReversion,
+            PlanKind::SessionBreakout,
+            PlanKind::VolatilitySqueeze,
         ]
     );
     assert_eq!(
@@ -507,6 +509,8 @@ fn all_six_plans_have_stable_order() {
             "QUASIMODO",
             "TREND_BREAKOUT",
             "MEAN_REVERSION",
+            "SESSION_BREAKOUT",
+            "VOLATILITY_SQUEEZE",
         ]
     );
 }

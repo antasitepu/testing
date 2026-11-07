@@ -2834,6 +2834,8 @@ fn build_tuning_facts_for_plan(
         PlanKind::Quasimodo => build_qm_tuning_facts(candles),
         PlanKind::TrendBreakout => build_trend_tuning_facts(candles),
         PlanKind::MeanReversion => build_mean_tuning_facts(candles),
+        // Pre-registered research plans are not tuned; they read the runtime facts.
+        PlanKind::SessionBreakout | PlanKind::VolatilitySqueeze => build_facts(candles),
     }
 }
 
@@ -3540,6 +3542,8 @@ fn runtime_replay_evaluator(plan: PlanKind) -> Box<dyn PlanEvaluator> {
         PlanKind::Quasimodo => Box::new(QuasimodoEvaluator),
         PlanKind::TrendBreakout => Box::new(TrendBreakoutEvaluator),
         PlanKind::MeanReversion => Box::new(MeanReversionEvaluator),
+        PlanKind::SessionBreakout => Box::new(analysis_plans::SessionBreakoutEvaluator),
+        PlanKind::VolatilitySqueeze => Box::new(analysis_plans::VolatilitySqueezeEvaluator),
     }
 }
 
@@ -4204,6 +4208,7 @@ fn selected_tuning_candidate(
         PlanKind::Quasimodo => qm_candidates(),
         PlanKind::TrendBreakout => trend_breakout_candidates(timeframe),
         PlanKind::MeanReversion => mean_reversion_candidates(),
+        PlanKind::SessionBreakout | PlanKind::VolatilitySqueeze => Vec::new(),
     };
     candidates
         .into_iter()
@@ -4225,6 +4230,8 @@ fn all_tuning_candidates(plan: PlanKind, timeframe: Timeframe) -> Vec<Candidate>
         PlanKind::Quasimodo => qm_candidates(),
         PlanKind::TrendBreakout => trend_breakout_candidates(timeframe),
         PlanKind::MeanReversion => mean_reversion_candidates(),
+        // No grid: these plans are pre-registered and evaluated once as written.
+        PlanKind::SessionBreakout | PlanKind::VolatilitySqueeze => Vec::new(),
     }
 }
 

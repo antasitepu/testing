@@ -1,12 +1,14 @@
 use analysis_domain::{
     AnalysisWorkItem, CanonicalMarketSnapshot, HtfFilterMode, IctParameters, MaterializedProfile,
     MeanReversionParameters, PlanKind, PlanParameters, PlanProfileKey, QuasimodoParameters,
-    Readiness, ReadinessReason, ReleaseMode, RsiPlanParameters, SmcParameters,
-    TrendBreakoutParameters, VersionIdentity, WorkSource, WorkStatus,
+    Readiness, ReadinessReason, ReleaseMode, RsiPlanParameters, SessionBreakoutParameters,
+    SmcParameters, TrendBreakoutParameters, VersionIdentity, VolatilitySqueezeParameters,
+    WorkSource, WorkStatus,
 };
 use analysis_plans::{
     IctEvaluator, MeanReversionEvaluator, PlanEvaluator, PlanRuntimeState, QuasimodoEvaluator,
-    RsiEvaluator, SmcEvaluator, TrendBreakoutEvaluator,
+    RsiEvaluator, SessionBreakoutEvaluator, SmcEvaluator, TrendBreakoutEvaluator,
+    VolatilitySqueezeEvaluator,
 };
 use analysis_service::{
     AnalysisCandleSource, AnalysisServiceError, AnalysisWorkStore, AnalysisWorker,
@@ -100,6 +102,31 @@ fn parameters(plan: PlanKind) -> PlanParameters {
             minimum_rr: Decimal::ONE,
             max_bars_valid: 10,
         }),
+        PlanKind::SessionBreakout => PlanParameters::SessionBreakout(SessionBreakoutParameters {
+            range_start_minute_utc: 0,
+            range_end_minute_utc: 420,
+            decision_end_minute_utc: 720,
+            time_exit_minute_utc: 1200,
+            atr_period: 14,
+            minimum_normalized_width: Decimal::new(5, 1),
+            maximum_normalized_width: Decimal::TWO,
+            target_rr: Decimal::TWO,
+            minimum_entry_rr: Decimal::ONE,
+        }),
+        PlanKind::VolatilitySqueeze => {
+            PlanParameters::VolatilitySqueeze(VolatilitySqueezeParameters {
+                bollinger_period: 20,
+                bollinger_deviation: Decimal::TWO,
+                keltner_atr_multiplier: Decimal::new(15, 1),
+                atr_period: 14,
+                minimum_squeeze_bars: 6,
+                breakout_window_bars: 3,
+                breakout_margin_atr: Decimal::new(1, 1),
+                stop_buffer_atr: Decimal::new(5, 1),
+                target_rr: Decimal::TWO,
+                max_bars_to_tp1: 20,
+            })
+        }
     }
 }
 
@@ -111,6 +138,8 @@ fn evaluator(plan: PlanKind) -> Arc<dyn PlanEvaluator> {
         PlanKind::Quasimodo => Arc::new(QuasimodoEvaluator),
         PlanKind::TrendBreakout => Arc::new(TrendBreakoutEvaluator),
         PlanKind::MeanReversion => Arc::new(MeanReversionEvaluator),
+        PlanKind::SessionBreakout => Arc::new(SessionBreakoutEvaluator),
+        PlanKind::VolatilitySqueeze => Arc::new(VolatilitySqueezeEvaluator),
     }
 }
 
@@ -379,7 +408,7 @@ async fn closed_candle_not_ready_fixture_matches_incremental_direct_and_backtest
             .iter()
             .map(|commit| commit.evaluations.len())
             .sum::<usize>(),
-        42
+        PlanKind::ALL.len() * Timeframe::ALL.len()
     );
 
     for profile in &profiles {

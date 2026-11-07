@@ -458,3 +458,32 @@ fn spread_mean_reversion_validates_actual_entry_and_new_breakeven_has_no_retroac
     assert!(exits[1].ambiguous_intrabar);
     assert_eq!(exits[1].price, entry); // Stop was activated after the candle open.
 }
+
+#[test]
+fn session_breakout_next_open_cancels_through_stop_target_or_minimum_rr_at_zero_spread() {
+    // Stop 90, target 120: open 90 is through the stop, 120 through the target,
+    // 106 leaves reward 14 for risk 16 (below 1.0), and 100 enters.
+    let mut breakout = signal(
+        PlanKind::SessionBreakout,
+        ExecutionInstruction::NextOpen,
+        Direction::Buy,
+    );
+    breakout.pre_entry_validation = Some(PreEntryValidation {
+        minimum_rr: Decimal::ONE,
+        reject_if_target_crossed: true,
+        reject_if_stop_crossed: true,
+    });
+    for (open, expected) in [
+        (90, ExecutionKind::EntryCancelled),
+        (120, ExecutionKind::EntryCancelled),
+        (106, ExecutionKind::EntryCancelled),
+        (100, ExecutionKind::Entry),
+    ] {
+        let bar = candle(60_000, open, open + 1, open - 1, open);
+        assert_eq!(
+            OhlcConservativeExecution::new().on_signal(&breakout, &bar)[0].kind,
+            expected,
+            "open {open}"
+        );
+    }
+}

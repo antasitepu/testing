@@ -5,8 +5,10 @@ mod ict;
 mod mean_reversion;
 mod quasimodo;
 mod rsi;
+mod session_breakout;
 mod smc;
 mod trend_breakout;
+mod volatility_squeeze;
 
 pub use common::{
     CandidateDecision, PlanError, PlanEvaluation, PlanEvaluator, PlanRuntimeState,
@@ -21,5 +23,9 @@ pub use mean_reversion::{
 };
 pub use quasimodo::QuasimodoEvaluator;
 pub use rsi::{RsiEvaluator, RsiV5Evaluator};
+pub use session_breakout::{
+    SessionBreakoutEvaluator, session_breakout_runs_on, validate_session_breakout_entry,
+};
 pub use smc::SmcEvaluator;
 pub use trend_breakout::TrendBreakoutEvaluator;
+pub use volatility_squeeze::VolatilitySqueezeEvaluator;

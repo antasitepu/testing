@@ -1,7 +1,7 @@
 use analysis_domain::{
     HtfFilterMode, IctParameters, MeanReversionParameters, PlanKind, PlanParameters,
-    PlanProfileKey, QuasimodoParameters, ReleaseMode, RsiPlanParameters, SmcParameters,
-    TrendBreakoutParameters, VersionIdentity,
+    PlanProfileKey, QuasimodoParameters, ReleaseMode, RsiPlanParameters, SessionBreakoutParameters,
+    SmcParameters, TrendBreakoutParameters, VersionIdentity, VolatilitySqueezeParameters,
 };
 use analysis_service::{
     ConfigurationRelease, MaterializedProfile, ReleaseLifecycle, ValidationGate,
@@ -109,6 +109,31 @@ fn parameters(plan: PlanKind, timeframe: Timeframe) -> PlanParameters {
             minimum_rr: Decimal::new(1, 0),
             max_bars_valid: 10,
         }),
+        PlanKind::SessionBreakout => PlanParameters::SessionBreakout(SessionBreakoutParameters {
+            range_start_minute_utc: 0,
+            range_end_minute_utc: 420,
+            decision_end_minute_utc: 720,
+            time_exit_minute_utc: 1200,
+            atr_period: 14,
+            minimum_normalized_width: Decimal::new(5, 1),
+            maximum_normalized_width: Decimal::TWO,
+            target_rr: Decimal::TWO,
+            minimum_entry_rr: Decimal::ONE,
+        }),
+        PlanKind::VolatilitySqueeze => {
+            PlanParameters::VolatilitySqueeze(VolatilitySqueezeParameters {
+                bollinger_period: 20,
+                bollinger_deviation: Decimal::TWO,
+                keltner_atr_multiplier: Decimal::new(15, 1),
+                atr_period: 14,
+                minimum_squeeze_bars: 6,
+                breakout_window_bars: 3,
+                breakout_margin_atr: Decimal::new(1, 1),
+                stop_buffer_atr: Decimal::new(5, 1),
+                target_rr: Decimal::TWO,
+                max_bars_to_tp1: 20,
+            })
+        }
     }
 }
 
@@ -166,9 +191,12 @@ fn passing_gate() -> ValidationGate {
 }
 
 #[test]
-fn validates_all_42_materialized_profiles_and_rejects_duplicates() {
+fn validates_all_materialized_profiles_and_rejects_duplicates() {
     let mut release = complete_release(ReleaseMode::Research);
-    assert_eq!(release.profiles.len(), 42);
+    assert_eq!(
+        release.profiles.len(),
+        PlanKind::ALL.len() * Timeframe::ALL.len()
+    );
     assert!(validate_release(&release).is_ok());
 
     release.profiles[1].key = release.profiles[0].key.clone();

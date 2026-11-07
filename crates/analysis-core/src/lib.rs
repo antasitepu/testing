@@ -6,6 +6,7 @@ mod engine;
 mod indicators;
 mod liquidity;
 mod range;
+mod session_range;
 mod structure;
 
 pub use barrier::{
@@ -25,6 +26,7 @@ pub use liquidity::{
     fvg_lifecycle, related_sequence,
 };
 pub use range::{DealingRange, RangeError, RangeRegion, build_dealing_range};
+pub use session_range::{SessionRangeFact, SessionRangeParameters, detect_session_ranges};
 pub use structure::{
     ConfirmedSwing, Displacement, DisplacementParameters, StructureAnalysis, StructureError,
     StructureEvent, StructureEventKind, SwingKind, SwingLabel, SwingParameters,

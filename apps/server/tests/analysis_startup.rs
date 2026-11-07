@@ -505,7 +505,7 @@ fn max_actual_rows_for_relation(plan: &Value, relation: &str) -> i64 {
 }
 
 #[tokio::test]
-async fn runtime_bootstrap_creates_active_six_plan_release_and_work_hook() {
+async fn runtime_bootstrap_creates_active_release_for_every_plan_and_work_hook() {
     let _guard = test_db_guard().await;
     let database_url = test_database_url();
     let pool = PgPoolOptions::new()
@@ -573,7 +573,8 @@ async fn runtime_bootstrap_creates_active_six_plan_release_and_work_hook() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(profiles, 42);
+    // Eight plans on seven timeframes; the two research plans are stored disabled.
+    assert_eq!(profiles, 56);
     let profile_contracts = sqlx::query(
         "SELECT plan, algorithm_version, parameter_version, position_management \
          FROM analysis_profiles ORDER BY plan, interval",
@@ -588,13 +589,10 @@ async fn runtime_bootstrap_creates_active_six_plan_release_and_work_hook() {
         let algorithm_version: String = row.get("algorithm_version");
         let parameter_version: String = row.get("parameter_version");
         let position_management: Value = row.get("position_management");
-        let expected_algorithm = if matches!(
-            plan.as_str(),
-            "ICT" | "SMC" | "RSI" | "QUASIMODO" | "TREND_BREAKOUT"
-        ) {
-            format!("{plan}-runtime-v4")
-        } else {
-            format!("{plan}-runtime-v3")
+        let expected_algorithm = match plan.as_str() {
+            "ICT" | "SMC" | "RSI" | "QUASIMODO" | "TREND_BREAKOUT" => format!("{plan}-runtime-v4"),
+            "SESSION_BREAKOUT" | "VOLATILITY_SQUEEZE" => format!("{plan}-runtime-v1"),
+            _ => format!("{plan}-runtime-v3"),
         };
         assert_eq!(algorithm_version, expected_algorithm);
         assert!(parameter_version.ends_with("-pp1-pc1"));
@@ -684,7 +682,7 @@ async fn runtime_bootstrap_replaces_incomplete_active_release() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(active_profiles, 42);
+    assert_eq!(active_profiles, 56);
     let retired: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM configuration_releases \
          WHERE release_id = $1 AND lifecycle = 'RETIRED'",

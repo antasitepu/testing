@@ -1,12 +1,13 @@
 use analysis_domain::{
     HtfFilterMode, IctFvgSelection, IctParameters, IctSweepBiasMode, MeanReversionParameters,
     PlanKind, PlanParameters, PlanProfileKey, PositionManagementParameters,
-    ProfitProtectionParameters, QuasimodoParameters, ReleaseMode, RsiPlanParameters, SmcParameters,
-    TrendBreakoutParameters, VersionIdentity,
+    ProfitProtectionParameters, QuasimodoParameters, ReleaseMode, RsiPlanParameters,
+    SessionBreakoutParameters, SmcParameters, TrendBreakoutParameters, VersionIdentity,
+    VolatilitySqueezeParameters,
 };
 use analysis_plans::{
     IctEvaluator, MeanReversionEvaluator, PlanEvaluator, QuasimodoEvaluator, RsiEvaluator,
-    SmcEvaluator, TrendBreakoutEvaluator,
+    SessionBreakoutEvaluator, SmcEvaluator, TrendBreakoutEvaluator, VolatilitySqueezeEvaluator,
 };
 use analysis_service::{
     AnalysisServiceError, ConfigurationRelease, MaterializedProfile, PlanRegistry,
@@ -19,7 +20,7 @@ use serde_json::json;
 use std::{collections::BTreeSet, sync::Arc};
 use uuid::Uuid;
 
-const EXPECTED_PROFILE_COUNT: usize = 42;
+const EXPECTED_PROFILE_COUNT: usize = 56;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -224,6 +225,8 @@ pub(super) fn runtime_plan_registry() -> PlanRegistry {
         Arc::new(QuasimodoEvaluator),
         Arc::new(TrendBreakoutEvaluator),
         Arc::new(MeanReversionEvaluator),
+        Arc::new(SessionBreakoutEvaluator),
+        Arc::new(VolatilitySqueezeEvaluator),
     ];
     PlanRegistry::new(evaluators)
 }
@@ -502,6 +505,32 @@ pub(super) fn default_parameters(plan: PlanKind, timeframe: Timeframe) -> PlanPa
                 max_bars_valid: 10,
             })
         }
+        // Pre-registered values, identical on every timeframe (specs of 2026-11-07).
+        PlanKind::SessionBreakout => PlanParameters::SessionBreakout(SessionBreakoutParameters {
+            range_start_minute_utc: 0,
+            range_end_minute_utc: 420,
+            decision_end_minute_utc: 720,
+            time_exit_minute_utc: 1200,
+            atr_period: 14,
+            minimum_normalized_width: Decimal::new(5, 1),
+            maximum_normalized_width: Decimal::new(2, 0),
+            target_rr: Decimal::new(2, 0),
+            minimum_entry_rr: Decimal::ONE,
+        }),
+        PlanKind::VolatilitySqueeze => {
+            PlanParameters::VolatilitySqueeze(VolatilitySqueezeParameters {
+                bollinger_period: 20,
+                bollinger_deviation: Decimal::new(2, 0),
+                keltner_atr_multiplier: Decimal::new(15, 1),
+                atr_period: 14,
+                minimum_squeeze_bars: 6,
+                breakout_window_bars: 3,
+                breakout_margin_atr: Decimal::new(1, 1),
+                stop_buffer_atr: Decimal::new(5, 1),
+                target_rr: Decimal::new(2, 0),
+                max_bars_to_tp1: 20,
+            })
+        }
     }
 }
 
@@ -534,16 +563,29 @@ fn catalog_entry(plan: PlanKind, timeframe: Timeframe) -> RuntimeProfileCatalogE
     RuntimeProfileCatalogEntry {
         plan,
         timeframe,
-        enabled: true,
+        enabled: !research_only(plan),
         algorithm_version: runtime_algorithm_version(plan),
         parameter_version: runtime_parameter_version(plan, timeframe),
         parameters: default_parameters(plan, timeframe),
         profit_protection: ProfitProtectionParameters::default(),
         position_management: runtime_position_management(plan, timeframe),
-        required_timeframes: next_higher_timeframe(timeframe).into_iter().collect(),
+        required_timeframes: if plan == PlanKind::SessionBreakout {
+            Vec::new()
+        } else {
+            next_higher_timeframe(timeframe).into_iter().collect()
+        },
         minimum_history_bars: runtime_minimum_history_bars(plan, timeframe),
         warmup_bars: 50,
     }
+}
+
+/// Research candidates stay disabled in production until they pass the sealed
+/// test window and the vault.
+const fn research_only(plan: PlanKind) -> bool {
+    matches!(
+        plan,
+        PlanKind::SessionBreakout | PlanKind::VolatilitySqueeze
+    )
 }
 
 fn runtime_position_management(
@@ -560,6 +602,8 @@ fn runtime_algorithm_version(plan: PlanKind) -> String {
         PlanKind::Quasimodo => "QUASIMODO-runtime-v4".to_owned(),
         PlanKind::Ict => "ICT-runtime-v4".to_owned(),
         PlanKind::Smc => "SMC-runtime-v4".to_owned(),
+        PlanKind::SessionBreakout => "SESSION_BREAKOUT-runtime-v1".to_owned(),
+        PlanKind::VolatilitySqueeze => "VOLATILITY_SQUEEZE-runtime-v1".to_owned(),
         _ => format!("{}-runtime-v3", plan.as_str()),
     }
 }
@@ -614,7 +658,10 @@ fn runtime_parameter_version(plan: PlanKind, target_timeframe: Timeframe) -> Str
         PlanKind::MeanReversion if matches!(target_timeframe, Timeframe::M5 | Timeframe::M15) => {
             "v2"
         }
-        PlanKind::TrendBreakout | PlanKind::MeanReversion => "v1",
+        PlanKind::TrendBreakout
+        | PlanKind::MeanReversion
+        | PlanKind::SessionBreakout
+        | PlanKind::VolatilitySqueeze => "v1",
     };
     format!(
         "{}-{}-runtime-{version}-pp1-pc1",
