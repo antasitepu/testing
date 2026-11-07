@@ -74,6 +74,10 @@ jobs:
               1m | 5m | 15m | 30m | 1h | 4h | 1d) ;;
               *) echo "unknown timeframe: $timeframe"; exit 1 ;;
             esac
+            # PAXG amendment 1: only timeframes that pass the per-timeframe quality rule.
+            if [[ "$SYMBOL" == PAXGUSDT && ! "$timeframe" =~ ^(15m|30m|1h)$ ]]; then
+              echo "PAXGUSDT is screened on 15m, 30m and 1h only (amendment 1); got $timeframe"; exit 1
+            fi
           done
           IFS=, read -ra plans <<<"$PLANS"
           for plan in "${plans[@]}"; do
