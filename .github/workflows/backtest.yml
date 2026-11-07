@@ -7,11 +7,12 @@ on:
         description: Release tag of the dataset in the private data repository
         required: true
       symbol:
-        description: Dataset symbol; PAXGUSDT needs a PAXG dataset tag and cutoff_ms 1765411199999
+        description: Dataset symbol; PAXGUSDT and XAUUSD need their own dataset tag and cutoff_ms 1765411199999
         type: choice
         options:
           - XAUUSDT
           - PAXGUSDT
+          - XAUUSD
         default: XAUUSDT
       timeframes:
         description: Comma-separated timeframes
@@ -65,8 +66,8 @@ jobs:
             echo "raw_window must be an integer >= 50"; exit 1
           fi
           (( CUTOFF_MS <= VAULT_END_MS )) || { echo "cutoff_ms passes the vault boundary"; exit 1; }
-          if [[ "$SYMBOL" == PAXGUSDT ]] && (( CUTOFF_MS > 1765411199999 )); then
-            echo "PAXGUSDT history ends at 1765411199999; set cutoff_ms to it"; exit 1
+          if [[ "$SYMBOL" =~ ^(PAXGUSDT|XAUUSD)$ ]] && (( CUTOFF_MS > 1765411199999 )); then
+            echo "$SYMBOL history ends at 1765411199999; set cutoff_ms to it"; exit 1
           fi
           IFS=, read -ra timeframes <<<"$TIMEFRAMES"
           for timeframe in "${timeframes[@]}"; do
@@ -74,9 +75,9 @@ jobs:
               1m | 5m | 15m | 30m | 1h | 4h | 1d) ;;
               *) echo "unknown timeframe: $timeframe"; exit 1 ;;
             esac
-            # PAXG amendment 1: only timeframes that pass the per-timeframe quality rule.
-            if [[ "$SYMBOL" == PAXGUSDT && ! "$timeframe" =~ ^(15m|30m|1h)$ ]]; then
-              echo "PAXGUSDT is screened on 15m, 30m and 1h only (amendment 1); got $timeframe"; exit 1
+            # PAXG amendment 1 and the XAUUSD quality result: only timeframes that pass.
+            if [[ "$SYMBOL" =~ ^(PAXGUSDT|XAUUSD)$ && ! "$timeframe" =~ ^(15m|30m|1h)$ ]]; then
+              echo "$SYMBOL is screened on 15m, 30m and 1h only; got $timeframe"; exit 1
             fi
           done
           IFS=, read -ra plans <<<"$PLANS"

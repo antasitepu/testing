@@ -1,0 +1,7 @@
+{
+  "version": "research-windows-xauusd-v1",
+  "trainStart": "2010-01-01",
+  "validationStart": "2019-01-01",
+  "testStart": "2022-01-01",
+  "vaultStart": "2025-12-11"
+}

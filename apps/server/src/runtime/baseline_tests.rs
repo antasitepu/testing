@@ -90,6 +90,7 @@ fn research_windows_config(symbol: &str) -> &'static str {
     match symbol {
         "XAUUSDT" => include_str!("../../../../config/research-windows.json"),
         "PAXGUSDT" => include_str!("../../../../config/research-windows-paxg.json"),
+        "XAUUSD" => include_str!("../../../../config/research-windows-xauusd.json"),
         other => panic!("no research windows for {other}"),
     }
 }
@@ -561,6 +562,17 @@ fn paxg_windows_end_where_xauusdt_history_begins() {
         "train never starts before 2021-01"
     );
     assert!(windows.train_start < windows.vault_start);
+}
+
+#[test]
+fn spot_gold_windows_end_where_xauusdt_history_begins() {
+    let dates: ResearchWindowDates =
+        serde_json::from_str(research_windows_config("XAUUSD")).unwrap();
+    let windows = ResearchWindows::from_dates(&dates).unwrap();
+    // Spot history stops at the XAUUSDT listing; the XAUUSDT windows stay untouched.
+    assert_eq!(windows.vault_start, 1_765_411_200_000);
+    assert_eq!(windows.train_start, 1_262_304_000_000, "train starts 2010-01-01");
+    assert_eq!(windows.test_start, 1_640_995_200_000, "test starts 2022-01-01");
 }
 
 #[test]
