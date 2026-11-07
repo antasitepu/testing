@@ -62,11 +62,13 @@ fn has_recent_gap(history: &History, timeframe: Timeframe, close: i64) -> bool {
         .is_some_and(|open| *open + timeframe.duration_ms() <= end)
 }
 
-fn fact_window(history: &History, end: usize) -> &[Candle] {
+/// The runtime reads the latest 1000 raw candles before session filtering.
+const RUNTIME_RAW_WINDOW: usize = 1000;
+
+fn fact_window(history: &History, end: usize, raw_window: usize) -> &[Candle] {
     let close = history.candles[end].close_time;
     let raw_end = history.raw_opens.partition_point(|open| *open <= close);
-    // Match the runtime's latest 1000 raw candles before session filtering.
-    let first_open = history.raw_opens[raw_end.saturating_sub(1000)];
+    let first_open = history.raw_opens[raw_end.saturating_sub(raw_window)];
     let start = history.candles[..=end].partition_point(|candle| candle.open_time < first_open);
     &history.candles[start..=end]
 }
@@ -113,6 +115,11 @@ async fn print_runtime_baseline_from_database() {
             .collect(),
         Err(_) => PlanKind::ALL.to_vec(),
     };
+    // Diagnostic only: a smaller window shows how much early-history bars differ.
+    let raw_window = std::env::var("GOLD_BASELINE_RAW_WINDOW")
+        .map(|value| value.parse::<usize>().expect("positive raw window"))
+        .unwrap_or(RUNTIME_RAW_WINDOW);
+    assert!(raw_window >= 50);
     let spread_price = std::env::var("GOLD_BASELINE_SPREAD_PRICE")
         .map(|value| value.parse::<Decimal>().expect("decimal spread price"))
         .unwrap_or(Decimal::ZERO);
@@ -235,7 +242,7 @@ async fn print_runtime_baseline_from_database() {
     println!(
         "BASELINE_PROTOCOL,{}",
         json!({
-            "cutoff": cutoff, "maxBars": max_bars, "rawWindow": 1000,
+            "cutoff": cutoff, "maxBars": max_bars, "rawWindow": raw_window,
             "historicalArrivalMode": "LIVE_POLICY", "rsiM1EntrySuppressed": true,
             "fees": "0", "extraSlippage": "0", "spread": spread, "executionModel": "OHLC_CONSERVATIVE",
             "databaseWrites": false,
@@ -294,7 +301,7 @@ async fn print_runtime_baseline_from_database() {
         let mut gap_frames = 0_usize;
         for index in start..history.candles.len() {
             let candle = &history.candles[index];
-            let window = fact_window(history, index);
+            let window = fact_window(history, index, raw_window);
             let target_count = window.len();
             let unresolved_gap = has_recent_gap(history, timeframe, candle.close_time);
             gap_frames += usize::from(unresolved_gap);
@@ -315,7 +322,7 @@ async fn print_runtime_baseline_from_database() {
                     .as_ref()
                     .is_none_or(|(cached, _, _)| *cached != end)
                 {
-                    let higher_window = fact_window(higher_history, end);
+                    let higher_window = fact_window(higher_history, end, raw_window);
                     higher_cache = Some((
                         end,
                         TimeframeFacts {
@@ -431,7 +438,7 @@ fn fact_window_counts_raw_candles_before_session_filtering() {
         raw_opens,
         missing_opens: Vec::new(),
     };
-    let window = fact_window(&history, history.candles.len() - 1);
+    let window = fact_window(&history, history.candles.len() - 1, RUNTIME_RAW_WINDOW);
     assert_eq!(window.len(), 500);
     assert_eq!(window.first().unwrap().open_time, 200 * 60_000);
 }
