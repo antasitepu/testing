@@ -158,3 +158,5 @@ jobs:
           name: results-${{ matrix.timeframe }}
           path: results-*.tar.age
           if-no-files-found: ignore
+          # fetch-run.sh deletes artifacts once decrypted; this is the fallback.
+          retention-days: 3
