@@ -100,6 +100,19 @@ async fn print_runtime_baseline_from_database() {
             .collect(),
         Err(_) => Timeframe::ALL.to_vec(),
     };
+    // Plans replay independently, so CI can split one timeframe across jobs.
+    let evaluated_plans: Vec<PlanKind> = match std::env::var("GOLD_BASELINE_PLANS") {
+        Ok(list) => list
+            .split(',')
+            .map(|name| {
+                PlanKind::ALL
+                    .into_iter()
+                    .find(|plan| plan.as_str() == name)
+                    .unwrap_or_else(|| panic!("unknown plan {name}"))
+            })
+            .collect(),
+        Err(_) => PlanKind::ALL.to_vec(),
+    };
     let spread_price = std::env::var("GOLD_BASELINE_SPREAD_PRICE")
         .map(|value| value.parse::<Decimal>().expect("decimal spread price"))
         .unwrap_or(Decimal::ZERO);
@@ -235,8 +248,9 @@ async fn print_runtime_baseline_from_database() {
         let start = history.candles.len().saturating_sub(max_bars);
         let evaluation_candles = &history.candles[start..];
         let registry = runtime_plan_registry();
-        let cases: Vec<_> = PlanKind::ALL
-            .into_iter()
+        let cases: Vec<_> = evaluated_plans
+            .iter()
+            .copied()
             .map(|plan| {
                 let mut profile =
                     default_runtime_profile(uuid::Uuid::now_v7(), symbol.clone(), plan, timeframe)

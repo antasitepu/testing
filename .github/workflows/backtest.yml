@@ -7,8 +7,11 @@ on:
         description: Release tag of the dataset in the private data repository
         required: true
       timeframes:
-        description: Comma-separated timeframes, one job each
+        description: Comma-separated timeframes
         default: 5m,15m,30m,1h
+      plans:
+        description: Comma-separated plans; each timeframe and plan runs as its own job
+        default: ICT,SMC,RSI,QUASIMODO,TREND_BREAKOUT,MEAN_REVERSION
       max_bars:
         description: Evaluated bars per timeframe (GOLD_BASELINE_MAX_BARS)
         default: "1000000"
@@ -28,10 +31,12 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       timeframes: ${{ steps.validate.outputs.timeframes }}
+      plans: ${{ steps.validate.outputs.plans }}
     steps:
       - id: validate
         env:
           TIMEFRAMES: ${{ inputs.timeframes }}
+          PLANS: ${{ inputs.plans }}
           MAX_BARS: ${{ inputs.max_bars }}
           CUTOFF_MS: ${{ inputs.cutoff_ms }}
           RESULTS_AGE_RECIPIENT: ${{ vars.RESULTS_AGE_RECIPIENT }}
@@ -41,14 +46,22 @@ jobs:
           [[ "$MAX_BARS" =~ ^[0-9]+$ ]] || { echo "max_bars must be an integer"; exit 1; }
           [[ "$CUTOFF_MS" =~ ^[0-9]+$ ]] || { echo "cutoff_ms must be an integer"; exit 1; }
           (( CUTOFF_MS <= VAULT_END_MS )) || { echo "cutoff_ms passes the vault boundary"; exit 1; }
-          IFS=, read -ra list <<<"$TIMEFRAMES"
-          for timeframe in "${list[@]}"; do
+          IFS=, read -ra timeframes <<<"$TIMEFRAMES"
+          for timeframe in "${timeframes[@]}"; do
             case "$timeframe" in
               1m | 5m | 15m | 30m | 1h | 4h | 1d) ;;
               *) echo "unknown timeframe: $timeframe"; exit 1 ;;
             esac
           done
-          echo "timeframes=$(printf '%s\n' "${list[@]}" | jq -Rnc '[inputs]')" >>"$GITHUB_OUTPUT"
+          IFS=, read -ra plans <<<"$PLANS"
+          for plan in "${plans[@]}"; do
+            case "$plan" in
+              ICT | SMC | RSI | QUASIMODO | TREND_BREAKOUT | MEAN_REVERSION) ;;
+              *) echo "unknown plan: $plan"; exit 1 ;;
+            esac
+          done
+          echo "timeframes=$(printf '%s\n' "${timeframes[@]}" | jq -Rnc '[inputs]')" >>"$GITHUB_OUTPUT"
+          echo "plans=$(printf '%s\n' "${plans[@]}" | jq -Rnc '[inputs]')" >>"$GITHUB_OUTPUT"
 
   baseline:
     needs: plan
@@ -58,6 +71,7 @@ jobs:
       fail-fast: false
       matrix:
         timeframe: ${{ fromJSON(needs.plan.outputs.timeframes) }}
+        plan: ${{ fromJSON(needs.plan.outputs.plans) }}
     services:
       postgres:
         image: postgres:16
@@ -76,8 +90,9 @@ jobs:
       DATABASE_URL: postgres://gold:gold@localhost:5432/gold
       CARGO_TERM_COLOR: never
       TIMEFRAME: ${{ matrix.timeframe }}
+      PLAN: ${{ matrix.plan }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
@@ -87,7 +102,7 @@ jobs:
           rustup toolchain install "$channel" --profile minimal -c clippy -c rustfmt
           rustup show active-toolchain
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: Download dataset
         env:
@@ -95,6 +110,8 @@ jobs:
           DATASET_REPO: ${{ vars.DATASET_REPO }}
           DATASET_TAG: ${{ inputs.dataset_tag }}
         run: |
+          [[ -n "$GH_TOKEN" ]] || { echo "secret DATASET_TOKEN is missing or empty"; exit 1; }
+          [[ -n "$DATASET_REPO" ]] || { echo "variable DATASET_REPO is not set"; exit 1; }
           gh release download "$DATASET_TAG" --repo "$DATASET_REPO" --pattern dataset.tar.gz --dir dataset
           tar -xzf dataset/dataset.tar.gz -C dataset
           (cd dataset && sha256sum -c SHA256SUMS)
@@ -123,14 +140,15 @@ jobs:
       - name: Baseline
         env:
           GOLD_BASELINE_TIMEFRAMES: ${{ matrix.timeframe }}
+          GOLD_BASELINE_PLANS: ${{ matrix.plan }}
           GOLD_BASELINE_MAX_BARS: ${{ inputs.max_bars }}
           GOLD_BASELINE_CUTOFF: ${{ inputs.cutoff_ms }}
         run: |
           # The log holds results, so it stays off the public job log.
           status=0
           cargo test --release --locked -p gold-monitoring-server --lib \
-            print_runtime_baseline_from_database -- --ignored --nocapture >"baseline-$TIMEFRAME.log" 2>&1 || status=$?
-          grep -vE '^(BASELINE|DATASET)' "baseline-$TIMEFRAME.log" |
+            print_runtime_baseline_from_database -- --ignored --nocapture >"baseline-$TIMEFRAME-$PLAN.log" 2>&1 || status=$?
+          grep -vE '^(BASELINE|DATASET)' "baseline-$TIMEFRAME-$PLAN.log" |
             grep -E '^test result|^error|panicked' | head -n 40 || true
           exit "$status"
 
@@ -142,20 +160,21 @@ jobs:
           MAX_BARS: ${{ inputs.max_bars }}
           CUTOFF_MS: ${{ inputs.cutoff_ms }}
         run: |
-          [[ -f "baseline-$TIMEFRAME.log" ]] || exit 0
+          name="$TIMEFRAME-$PLAN"
+          [[ -f "baseline-$name.log" ]] || exit 0
           command -v age >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq age; }
-          jq -n --arg timeframe "$TIMEFRAME" --arg dataset "$DATASET_TAG" --arg maxBars "$MAX_BARS" \
-            --arg cutoff "$CUTOFF_MS" --arg commit "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" \
-            '{timeframe: $timeframe, datasetTag: $dataset, maxBars: $maxBars, cutoffMs: $cutoff, publicCommit: $commit, runId: $run}' \
-            >"run-info-$TIMEFRAME.json"
-          tar -cf "results-$TIMEFRAME.tar" "baseline-$TIMEFRAME.log" "run-info-$TIMEFRAME.json"
-          age -r "$RESULTS_AGE_RECIPIENT" -o "results-$TIMEFRAME.tar.age" "results-$TIMEFRAME.tar"
-          rm -f "results-$TIMEFRAME.tar" "baseline-$TIMEFRAME.log"
+          jq -n --arg timeframe "$TIMEFRAME" --arg plan "$PLAN" --arg dataset "$DATASET_TAG" \
+            --arg maxBars "$MAX_BARS" --arg cutoff "$CUTOFF_MS" --arg commit "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" \
+            '{timeframe: $timeframe, plan: $plan, datasetTag: $dataset, maxBars: $maxBars, cutoffMs: $cutoff, publicCommit: $commit, runId: $run}' \
+            >"run-info-$name.json"
+          tar -cf "results-$name.tar" "baseline-$name.log" "run-info-$name.json"
+          age -r "$RESULTS_AGE_RECIPIENT" -o "results-$name.tar.age" "results-$name.tar"
+          rm -f "results-$name.tar" "baseline-$name.log"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: results-${{ matrix.timeframe }}
+          name: results-${{ matrix.timeframe }}-${{ matrix.plan }}
           path: results-*.tar.age
           if-no-files-found: ignore
           # fetch-run.sh deletes artifacts once decrypted; this is the fallback.
