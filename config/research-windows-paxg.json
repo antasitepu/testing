@@ -1,0 +1,7 @@
+{
+  "version": "research-windows-paxg-v1",
+  "trainStart": "2021-01-01",
+  "validationStart": "2024-01-01",
+  "testStart": "2025-01-01",
+  "vaultStart": "2025-12-11"
+}

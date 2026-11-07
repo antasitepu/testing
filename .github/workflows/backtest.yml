@@ -6,6 +6,13 @@ on:
       dataset_tag:
         description: Release tag of the dataset in the private data repository
         required: true
+      symbol:
+        description: Dataset symbol; PAXGUSDT needs a PAXG dataset tag and cutoff_ms 1765411199999
+        type: choice
+        options:
+          - XAUUSDT
+          - PAXGUSDT
+        default: XAUUSDT
       timeframes:
         description: Comma-separated timeframes
         default: 5m,15m,30m,1h
@@ -47,6 +54,7 @@ jobs:
           MAX_BARS: ${{ inputs.max_bars }}
           CUTOFF_MS: ${{ inputs.cutoff_ms }}
           RAW_WINDOW: ${{ inputs.raw_window }}
+          SYMBOL: ${{ inputs.symbol }}
           RESULTS_AGE_RECIPIENT: ${{ vars.RESULTS_AGE_RECIPIENT }}
         run: |
           # Results are only ever uploaded encrypted; refuse to run without a recipient.
@@ -57,6 +65,9 @@ jobs:
             echo "raw_window must be an integer >= 50"; exit 1
           fi
           (( CUTOFF_MS <= VAULT_END_MS )) || { echo "cutoff_ms passes the vault boundary"; exit 1; }
+          if [[ "$SYMBOL" == PAXGUSDT ]] && (( CUTOFF_MS > 1765411199999 )); then
+            echo "PAXGUSDT history ends at 1765411199999; set cutoff_ms to it"; exit 1
+          fi
           IFS=, read -ra timeframes <<<"$TIMEFRAMES"
           for timeframe in "${timeframes[@]}"; do
             case "$timeframe" in
@@ -152,6 +163,7 @@ jobs:
         env:
           GOLD_BASELINE_TIMEFRAMES: ${{ matrix.timeframe }}
           GOLD_BASELINE_PLANS: ${{ matrix.plan }}
+          GOLD_BASELINE_SYMBOL: ${{ inputs.symbol }}
           GOLD_BASELINE_MAX_BARS: ${{ inputs.max_bars }}
           GOLD_BASELINE_CUTOFF: ${{ inputs.cutoff_ms }}
           GOLD_BASELINE_RAW_WINDOW: ${{ inputs.raw_window }}
@@ -174,13 +186,14 @@ jobs:
           CUTOFF_MS: ${{ inputs.cutoff_ms }}
           RAW_WINDOW: ${{ inputs.raw_window }}
           EDGE: ${{ inputs.edge }}
+          SYMBOL: ${{ inputs.symbol }}
         run: |
           name="$TIMEFRAME-$PLAN"
           [[ -f "baseline-$name.log" ]] || exit 0
           command -v age >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq age; }
           jq -n --arg timeframe "$TIMEFRAME" --arg plan "$PLAN" --arg dataset "$DATASET_TAG" \
-            --arg maxBars "$MAX_BARS" --arg cutoff "$CUTOFF_MS" --arg rawWindow "$RAW_WINDOW" --arg edge "$EDGE" --arg commit "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" \
-            '{timeframe: $timeframe, plan: $plan, datasetTag: $dataset, maxBars: $maxBars, cutoffMs: $cutoff, rawWindow: $rawWindow, edgeBenchmark: $edge, publicCommit: $commit, runId: $run}' \
+            --arg maxBars "$MAX_BARS" --arg cutoff "$CUTOFF_MS" --arg rawWindow "$RAW_WINDOW" --arg edge "$EDGE" --arg symbol "$SYMBOL" --arg commit "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" \
+            '{timeframe: $timeframe, plan: $plan, datasetTag: $dataset, maxBars: $maxBars, cutoffMs: $cutoff, rawWindow: $rawWindow, edgeBenchmark: $edge, symbol: $symbol, publicCommit: $commit, runId: $run}' \
             >"run-info-$name.json"
           tar -cf "results-$name.tar" "baseline-$name.log" "run-info-$name.json"
           age -r "$RESULTS_AGE_RECIPIENT" -o "results-$name.tar.age" "results-$name.tar"

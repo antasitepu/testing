@@ -85,6 +85,15 @@ fn facts_for_window(window: &[Candle]) -> Vec<ConfirmedFact<Value>> {
     }
 }
 
+/// Research windows per dataset; each symbol has its own fixed calendar.
+fn research_windows_config(symbol: &str) -> &'static str {
+    match symbol {
+        "XAUUSDT" => include_str!("../../../../config/research-windows.json"),
+        "PAXGUSDT" => include_str!("../../../../config/research-windows-paxg.json"),
+        other => panic!("no research windows for {other}"),
+    }
+}
+
 #[tokio::test]
 #[ignore = "manual 42-profile read-only baseline; requires local candle history"]
 async fn print_runtime_baseline_from_database() {
@@ -124,10 +133,13 @@ async fn print_runtime_baseline_from_database() {
         .map(|value| value.parse::<usize>().expect("positive raw window"))
         .unwrap_or(RUNTIME_RAW_WINDOW);
     assert!(raw_window >= 50);
+    let symbol =
+        Symbol::new(std::env::var("GOLD_BASELINE_SYMBOL").unwrap_or_else(|_| "XAUUSDT".to_owned()))
+            .expect("valid baseline symbol");
     // Entry-edge benchmark (edge-v1), printed as EDGE_CASE lines after each case.
     let edge_windows = (std::env::var("GOLD_EDGE_BENCHMARK").as_deref() == Ok("1")).then(|| {
         let dates: ResearchWindowDates =
-            serde_json::from_str(include_str!("../../../../config/research-windows.json"))
+            serde_json::from_str(research_windows_config(symbol.as_str()))
                 .expect("research windows config");
         ResearchWindows::from_dates(&dates).expect("valid research windows")
     });
@@ -164,7 +176,6 @@ async fn print_runtime_baseline_from_database() {
         .connect(&database_url)
         .await
         .expect("connect read-only baseline database");
-    let symbol = Symbol::new("XAUUSDT").unwrap();
     let cutoff: i64 = sqlx::query_scalar(
         "SELECT MIN(latest_close) FROM (SELECT MAX(close_time) AS latest_close \
          FROM candles WHERE symbol = $1 AND interval = ANY($2) \
@@ -536,6 +547,20 @@ fn edge_atr_at_the_signal_bar_ignores_the_entry_bar() {
     let after = analysis_core::calculate_atr(&candles, EDGE_V1.atr_period).unwrap();
     assert_eq!(before.values[19], after.values[19]);
     assert_ne!(before.values[20], after.values[20]);
+}
+
+#[test]
+fn paxg_windows_end_where_xauusdt_history_begins() {
+    let dates: ResearchWindowDates =
+        serde_json::from_str(research_windows_config("PAXGUSDT")).unwrap();
+    let windows = ResearchWindows::from_dates(&dates).unwrap();
+    // PAXG history stops at the XAUUSDT listing, so the two datasets never overlap.
+    assert_eq!(windows.vault_start, 1_765_411_200_000);
+    assert!(
+        windows.train_start >= 1_609_459_200_000,
+        "train never starts before 2021-01"
+    );
+    assert!(windows.train_start < windows.vault_start);
 }
 
 #[test]
