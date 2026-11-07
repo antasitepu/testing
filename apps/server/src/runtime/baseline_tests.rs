@@ -4,6 +4,10 @@ use analysis_domain::{
     CanonicalMarketSnapshot, MaterializedProfile, ReadinessReason, TimeframeFacts,
 };
 use analysis_plans::{PlanError, PlanEvaluation, PlanEvaluator, PlanRuntimeState};
+use backtest_engine::edge::{
+    EDGE_V1, RealEntry, ResearchWindowDates, ResearchWindows, eligible_bars, evaluate_case,
+    precompute_outcomes,
+};
 use backtest_engine::{
     BacktestReplay, BacktestRunInput, CandlePriceReference, FeeConfig, ReplayFrame, SlippageConfig,
     SpreadConfig,
@@ -120,9 +124,20 @@ async fn print_runtime_baseline_from_database() {
         .map(|value| value.parse::<usize>().expect("positive raw window"))
         .unwrap_or(RUNTIME_RAW_WINDOW);
     assert!(raw_window >= 50);
+    // Entry-edge benchmark (edge-v1), printed as EDGE_CASE lines after each case.
+    let edge_windows = (std::env::var("GOLD_EDGE_BENCHMARK").as_deref() == Ok("1")).then(|| {
+        let dates: ResearchWindowDates =
+            serde_json::from_str(include_str!("../../../../config/research-windows.json"))
+                .expect("research windows config");
+        ResearchWindows::from_dates(&dates).expect("valid research windows")
+    });
     let spread_price = std::env::var("GOLD_BASELINE_SPREAD_PRICE")
         .map(|value| value.parse::<Decimal>().expect("decimal spread price"))
         .unwrap_or(Decimal::ZERO);
+    assert!(
+        edge_windows.is_none() || spread_price.is_zero(),
+        "the edge benchmark runs at the baseline default spread of 0"
+    );
     let reference = match std::env::var("GOLD_BASELINE_CANDLE_REFERENCE").as_deref() {
         Ok("MID") => CandlePriceReference::Mid,
         Ok("BID") => CandlePriceReference::Bid,
@@ -297,6 +312,14 @@ async fn print_runtime_baseline_from_database() {
                 .unwrap()
             })
             .collect();
+        let edge_outcomes = edge_windows.map(|_| {
+            let atr = analysis_core::calculate_atr(&history.candles, EDGE_V1.atr_period)
+                .expect("edge ATR")
+                .values;
+            precompute_outcomes(&history.candles, &atr, &EDGE_V1).expect("edge outcomes")
+        });
+        // Readiness when each bar closed, per case; bars before `start` were never evaluated.
+        let mut ready_at_close = vec![vec![false; start]; cases.len()];
         let mut higher_cache: Option<(usize, TimeframeFacts, usize)> = None;
         let mut gap_frames = 0_usize;
         for index in start..history.candles.len() {
@@ -356,7 +379,9 @@ async fn print_runtime_baseline_from_database() {
                 directives: Vec::new(),
                 warmup: false,
             };
-            for (session, (profile, _, _)) in sessions.iter_mut().zip(&cases) {
+            for (case_index, (session, (profile, _, _))) in
+                sessions.iter_mut().zip(&cases).enumerate()
+            {
                 frame.snapshot.readiness = if unresolved_gap {
                     Readiness::NotReady {
                         reason: ReadinessReason::UnresolvedGap,
@@ -376,6 +401,7 @@ async fn print_runtime_baseline_from_database() {
                 } else {
                     Readiness::Ready
                 };
+                ready_at_close[case_index].push(frame.snapshot.readiness == Readiness::Ready);
                 session.process_frame(&frame).unwrap();
             }
             if (index - start + 1) % 1000 == 0 {
@@ -386,7 +412,9 @@ async fn print_runtime_baseline_from_database() {
                 );
             }
         }
-        for (session, (profile, _, runtime_algorithm)) in sessions.into_iter().zip(&cases) {
+        for (case_index, (session, (profile, _, runtime_algorithm))) in
+            sessions.into_iter().zip(&cases).enumerate()
+        {
             let result = session.finish(evaluation_candles.len() as u64);
             println!(
                 "BASELINE_CASE,{}",
@@ -406,6 +434,48 @@ async fn print_runtime_baseline_from_database() {
                     "ambiguousExecutions": result.executions.iter().filter(|e| e.ambiguous_intrabar).count(),
                 })
             );
+            if let (Some(windows), Some(outcomes)) = (&edge_windows, &edge_outcomes) {
+                let entries: Vec<_> = result
+                    .trades
+                    .iter()
+                    .map(|trade| RealEntry {
+                        entry_time: trade.entry_time,
+                        entry_price: trade.entry_price,
+                        direction: trade.direction,
+                    })
+                    .collect();
+                let eligible = eligible_bars(
+                    &history.candles,
+                    outcomes,
+                    &ready_at_close[case_index],
+                    windows,
+                )
+                .expect("edge eligibility");
+                let case_key = format!(
+                    "{}/{}/{}/{}",
+                    timeframe.as_str(),
+                    profile.key.plan.as_str(),
+                    profile.versions.algorithm_version,
+                    profile.versions.parameter_version
+                );
+                for line in evaluate_case(
+                    &history.candles,
+                    outcomes,
+                    &eligible,
+                    &entries,
+                    windows,
+                    &case_key,
+                    &EDGE_V1,
+                ) {
+                    let mut value = serde_json::to_value(&line).expect("edge line");
+                    value["timeframe"] = json!(timeframe.as_str());
+                    value["plan"] = json!(profile.key.plan.as_str());
+                    value["algorithmVersion"] = json!(profile.versions.algorithm_version);
+                    value["parameterVersion"] = json!(profile.versions.parameter_version);
+                    value["runtimeAlgorithm"] = json!(runtime_algorithm);
+                    println!("EDGE_CASE,{value}");
+                }
+            }
         }
     }
     pool.close().await;
@@ -441,6 +511,41 @@ fn fact_window_counts_raw_candles_before_session_filtering() {
     let window = fact_window(&history, history.candles.len() - 1, RUNTIME_RAW_WINDOW);
     assert_eq!(window.len(), 500);
     assert_eq!(window.first().unwrap().open_time, 200 * 60_000);
+}
+
+#[test]
+fn edge_atr_at_the_signal_bar_ignores_the_entry_bar() {
+    let symbol = Symbol::new("XAUUSDT").unwrap();
+    let candle = |index: i64, high: i64, low: i64, close: i64| {
+        Candle::new(
+            symbol.clone(),
+            Timeframe::M5,
+            index * 300_000,
+            index * 300_000 + 299_999,
+            Decimal::new(100, 0),
+            Decimal::new(high, 0),
+            Decimal::new(low, 0),
+            Decimal::new(close, 0),
+        )
+        .unwrap()
+    };
+    let mut candles: Vec<_> = (0..30).map(|index| candle(index, 102, 98, 100)).collect();
+    let before = analysis_core::calculate_atr(&candles, EDGE_V1.atr_period).unwrap();
+    // An entry at bar 20 reads the ATR of bar 19; reshaping bar 20 must not move it.
+    candles[20] = candle(20, 150, 60, 140);
+    let after = analysis_core::calculate_atr(&candles, EDGE_V1.atr_period).unwrap();
+    assert_eq!(before.values[19], after.values[19]);
+    assert_ne!(before.values[20], after.values[20]);
+}
+
+#[test]
+fn research_windows_config_is_ordered_and_matches_the_agreed_dates() {
+    let dates: ResearchWindowDates =
+        serde_json::from_str(include_str!("../../../../config/research-windows.json")).unwrap();
+    let windows = ResearchWindows::from_dates(&dates).unwrap();
+    assert_eq!(windows.train_start, 1_767_312_000_000);
+    // The vault starts right after the dataset cutoff used by CI.
+    assert_eq!(windows.vault_start, 1_793_836_799_999 + 1);
 }
 
 #[test]

@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod edge;
 mod execution;
 mod metrics;
 mod replay;

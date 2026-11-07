@@ -1,0 +1,7 @@
+{
+  "version": "research-windows-v1",
+  "trainStart": "2026-01-02",
+  "validationStart": "2026-07-01",
+  "testStart": "2026-09-01",
+  "vaultStart": "2026-11-05"
+}

@@ -21,6 +21,10 @@ on:
       raw_window:
         description: Raw candles per fact window; 1000 matches the runtime, other values are diagnostics
         default: "1000"
+      edge:
+        description: Also run the entry-edge benchmark (edge-v1) and add EDGE_CASE lines to the results
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -151,6 +155,7 @@ jobs:
           GOLD_BASELINE_MAX_BARS: ${{ inputs.max_bars }}
           GOLD_BASELINE_CUTOFF: ${{ inputs.cutoff_ms }}
           GOLD_BASELINE_RAW_WINDOW: ${{ inputs.raw_window }}
+          GOLD_EDGE_BENCHMARK: ${{ inputs.edge && '1' || '0' }}
         run: |
           # The log holds results, so it stays off the public job log.
           status=0
@@ -168,13 +173,14 @@ jobs:
           MAX_BARS: ${{ inputs.max_bars }}
           CUTOFF_MS: ${{ inputs.cutoff_ms }}
           RAW_WINDOW: ${{ inputs.raw_window }}
+          EDGE: ${{ inputs.edge }}
         run: |
           name="$TIMEFRAME-$PLAN"
           [[ -f "baseline-$name.log" ]] || exit 0
           command -v age >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq age; }
           jq -n --arg timeframe "$TIMEFRAME" --arg plan "$PLAN" --arg dataset "$DATASET_TAG" \
-            --arg maxBars "$MAX_BARS" --arg cutoff "$CUTOFF_MS" --arg rawWindow "$RAW_WINDOW" --arg commit "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" \
-            '{timeframe: $timeframe, plan: $plan, datasetTag: $dataset, maxBars: $maxBars, cutoffMs: $cutoff, rawWindow: $rawWindow, publicCommit: $commit, runId: $run}' \
+            --arg maxBars "$MAX_BARS" --arg cutoff "$CUTOFF_MS" --arg rawWindow "$RAW_WINDOW" --arg edge "$EDGE" --arg commit "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" \
+            '{timeframe: $timeframe, plan: $plan, datasetTag: $dataset, maxBars: $maxBars, cutoffMs: $cutoff, rawWindow: $rawWindow, edgeBenchmark: $edge, publicCommit: $commit, runId: $run}' \
             >"run-info-$name.json"
           tar -cf "results-$name.tar" "baseline-$name.log" "run-info-$name.json"
           age -r "$RESULTS_AGE_RECIPIENT" -o "results-$name.tar.age" "results-$name.tar"
