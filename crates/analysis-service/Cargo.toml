@@ -1,0 +1,24 @@
+[package]
+name = "analysis-service"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+analysis-core = { path = "../analysis-core" }
+analysis-domain = { path = "../analysis-domain" }
+analysis-plans = { path = "../analysis-plans" }
+async-trait.workspace = true
+backtest-engine = { path = "../backtest-engine" }
+market-domain = { path = "../market-domain" }
+runtime-observability.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+rust_decimal.workspace = true

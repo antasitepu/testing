@@ -1,0 +1,22 @@
+[package]
+name = "execution-storage"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+analysis-domain = { path = "../analysis-domain" }
+async-trait.workspace = true
+chrono.workspace = true
+execution-domain = { path = "../execution-domain" }
+execution-service = { path = "../execution-service" }
+market-domain = { path = "../market-domain" }
+runtime-observability.workspace = true
+rust_decimal.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

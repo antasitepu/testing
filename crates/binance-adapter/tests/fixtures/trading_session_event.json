@@ -1,0 +1,10 @@
+{
+  "stream": "tradingSession",
+  "data": {
+    "e": "CommodityUpdate",
+    "E": 1782151403000,
+    "t": 1782079200000,
+    "T": 1782162000000,
+    "S": "REGULAR"
+  }
+}

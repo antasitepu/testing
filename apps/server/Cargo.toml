@@ -1,0 +1,44 @@
+[package]
+name = "gold-monitoring-server"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+analysis-core = { path = "../../crates/analysis-core" }
+analysis-domain = { path = "../../crates/analysis-domain" }
+analysis-plans = { path = "../../crates/analysis-plans" }
+analysis-service = { path = "../../crates/analysis-service" }
+analysis-storage = { path = "../../crates/analysis-storage" }
+async-trait.workspace = true
+axum.workspace = true
+binance-adapter = { path = "../../crates/binance-adapter" }
+dotenvy.workspace = true
+execution-service = { path = "../../crates/execution-service" }
+execution-storage = { path = "../../crates/execution-storage" }
+futures-util.workspace = true
+market-domain = { path = "../../crates/market-domain" }
+market-service = { path = "../../crates/market-service" }
+market-storage = { path = "../../crates/market-storage" }
+reqwest.workspace = true
+runtime-observability.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+backtest-engine = { path = "../../crates/backtest-engine" }
+execution-domain = { path = "../../crates/execution-domain" }
+http-body-util.workspace = true
+rust_decimal.workspace = true
+tower.workspace = true

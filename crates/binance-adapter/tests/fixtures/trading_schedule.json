@@ -1,0 +1,19 @@
+{
+  "updateTime": 1782151125292,
+  "marketSchedules": {
+    "COMMODITY": {
+      "sessions": [
+        {
+          "startTime": 1782079200000,
+          "endTime": 1782162000000,
+          "type": "REGULAR"
+        },
+        {
+          "startTime": 1782162000000,
+          "endTime": 1782165600000,
+          "type": "NO_TRADING"
+        }
+      ]
+    }
+  }
+}

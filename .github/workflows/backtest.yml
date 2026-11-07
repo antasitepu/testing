@@ -1,0 +1,135 @@
+name: backtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset_tag:
+        description: Release tag of the dataset in the private data repository
+        required: true
+      timeframes:
+        description: Comma-separated timeframes, one job each
+        default: 5m,15m,1h
+      max_bars:
+        description: Evaluated bars per timeframe (GOLD_BASELINE_MAX_BARS)
+        default: "1000000"
+      cutoff_ms:
+        description: Pinned closed-candle cutoff; must not pass the vault boundary
+        default: "1793836799999"
+
+permissions:
+  contents: read
+
+env:
+  # 2026-11-04 23:59:59.999 UTC. Later data is the vault and never enters CI.
+  VAULT_END_MS: "1793836799999"
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      timeframes: ${{ steps.validate.outputs.timeframes }}
+    steps:
+      - id: validate
+        env:
+          TIMEFRAMES: ${{ inputs.timeframes }}
+          MAX_BARS: ${{ inputs.max_bars }}
+          CUTOFF_MS: ${{ inputs.cutoff_ms }}
+        run: |
+          [[ "$MAX_BARS" =~ ^[0-9]+$ ]] || { echo "max_bars must be an integer"; exit 1; }
+          [[ "$CUTOFF_MS" =~ ^[0-9]+$ ]] || { echo "cutoff_ms must be an integer"; exit 1; }
+          (( CUTOFF_MS <= VAULT_END_MS )) || { echo "cutoff_ms passes the vault boundary"; exit 1; }
+          IFS=, read -ra list <<<"$TIMEFRAMES"
+          for timeframe in "${list[@]}"; do
+            case "$timeframe" in
+              1m | 5m | 15m | 30m | 1h | 4h | 1d) ;;
+              *) echo "unknown timeframe: $timeframe"; exit 1 ;;
+            esac
+          done
+          echo "timeframes=$(printf '%s\n' "${list[@]}" | jq -Rnc '[inputs]')" >>"$GITHUB_OUTPUT"
+
+  baseline:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        timeframe: ${{ fromJSON(needs.plan.outputs.timeframes) }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: gold
+          POSTGRES_PASSWORD: gold
+          POSTGRES_DB: gold
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gold"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://gold:gold@localhost:5432/gold
+      CARGO_TERM_COLOR: never
+      TIMEFRAME: ${{ matrix.timeframe }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          rustup toolchain install "$channel" --profile minimal -c clippy -c rustfmt
+          rustup show active-toolchain
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Download dataset
+        env:
+          GH_TOKEN: ${{ secrets.DATASET_TOKEN }}
+          DATASET_REPO: ${{ vars.DATASET_REPO }}
+          DATASET_TAG: ${{ inputs.dataset_tag }}
+        run: |
+          gh release download "$DATASET_TAG" --repo "$DATASET_REPO" --pattern dataset.tar.gz --dir dataset
+          tar -xzf dataset/dataset.tar.gz -C dataset
+          (cd dataset && sha256sum -c SHA256SUMS)
+          cat dataset/MANIFEST
+
+      - name: Create schema
+        run: >-
+          cargo run --release --locked -p gold-monitoring-server --example migrate_from_source --
+          --database-url "$DATABASE_URL" --source migrations
+
+      - name: Load dataset
+        run: |
+          command -v psql >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq postgresql-client; }
+          for table in markets candles market_sessions; do
+            columns="$(head -n 1 "dataset/$table.csv")"
+            psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 \
+              -c "\copy $table ($columns) FROM 'dataset/$table.csv' CSV HEADER"
+          done
+
+      - name: Vault guard
+        run: |
+          max_close="$(psql "$DATABASE_URL" -X -At -c 'SELECT COALESCE(MAX(close_time), 0) FROM candles')"
+          echo "latest candle close: $max_close, vault boundary: $VAULT_END_MS"
+          (( max_close <= VAULT_END_MS )) || { echo "dataset reaches into the vault"; exit 1; }
+
+      - name: Baseline
+        env:
+          GOLD_BASELINE_TIMEFRAMES: ${{ matrix.timeframe }}
+          GOLD_BASELINE_MAX_BARS: ${{ inputs.max_bars }}
+          GOLD_BASELINE_CUTOFF: ${{ inputs.cutoff_ms }}
+        run: |
+          set -o pipefail
+          cargo test --release --locked -p gold-monitoring-server --lib \
+            print_runtime_baseline_from_database -- --ignored --nocapture 2>&1 | tee "baseline-$TIMEFRAME.log"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: baseline-${{ matrix.timeframe }}
+          path: baseline-*.log
+          if-no-files-found: ignore

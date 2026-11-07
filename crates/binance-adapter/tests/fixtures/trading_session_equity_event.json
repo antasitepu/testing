@@ -1,0 +1,7 @@
+{
+  "stream": "tradingSession",
+  "data": {
+    "e": "EquityUpdate",
+    "E": 1782151403000
+  }
+}

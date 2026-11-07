@@ -1,0 +1,19 @@
+{
+  "symbols": [
+    {
+      "symbol": "XAUUSDT",
+      "contractType": "TRADIFI_PERPETUAL",
+      "onboardDate": 1765440300000,
+      "status": "TRADING",
+      "underlyingType": "COMMODITY",
+      "filters": [
+        {
+          "filterType": "PRICE_FILTER",
+          "minPrice": "0.01",
+          "maxPrice": "200000",
+          "tickSize": "0.01"
+        }
+      ]
+    }
+  ]
+}

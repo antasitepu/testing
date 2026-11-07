@@ -1,0 +1,20 @@
+[package]
+name = "market-service"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+futures-util.workspace = true
+market-domain = { path = "../market-domain" }
+runtime-observability.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+rust_decimal.workspace = true

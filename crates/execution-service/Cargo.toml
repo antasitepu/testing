@@ -1,0 +1,22 @@
+[package]
+name = "execution-service"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+analysis-domain = { path = "../analysis-domain" }
+analysis-plans = { path = "../analysis-plans" }
+async-trait.workspace = true
+execution-domain = { path = "../execution-domain" }
+market-domain = { path = "../market-domain" }
+rust_decimal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

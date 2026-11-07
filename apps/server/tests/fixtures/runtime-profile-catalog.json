@@ -1,0 +1,1782 @@
+[
+  {
+    "plan": "ICT",
+    "timeframe": "1m",
+    "enabled": true,
+    "algorithmVersion": "ICT-runtime-v4",
+    "parameterVersion": "ICT-1m-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "ICT",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "biasMaxBarsValid": 20,
+        "displacementMaxBarsValid": 5,
+        "entryMaxBarsValid": 10,
+        "fvgSelection": "NEAREST_AFTER_DISPLACEMENT",
+        "higherTimeframe": "5m",
+        "minimumRr": "1.5",
+        "sweepBiasMode": "OPPOSITE_BIAS",
+        "sweepMaxBarsValid": 10
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "5m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "ICT",
+    "timeframe": "5m",
+    "enabled": true,
+    "algorithmVersion": "ICT-runtime-v4",
+    "parameterVersion": "ICT-5m-runtime-v4-pp1-pc1",
+    "parameters": {
+      "kind": "ICT",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "biasMaxBarsValid": 20,
+        "displacementMaxBarsValid": 5,
+        "entryMaxBarsValid": 20,
+        "fvgSelection": "NEAREST_AFTER_DISPLACEMENT",
+        "higherTimeframe": "15m",
+        "minimumRr": "0.8",
+        "sweepBiasMode": "SAME_BIAS",
+        "sweepMaxBarsValid": 10
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "15m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "ICT",
+    "timeframe": "15m",
+    "enabled": true,
+    "algorithmVersion": "ICT-runtime-v4",
+    "parameterVersion": "ICT-15m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "ICT",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "biasMaxBarsValid": 20,
+        "displacementMaxBarsValid": 5,
+        "entryMaxBarsValid": 10,
+        "fvgSelection": "NEAREST_AFTER_DISPLACEMENT",
+        "higherTimeframe": "30m",
+        "minimumRr": "0.8",
+        "sweepBiasMode": "OPPOSITE_BIAS",
+        "sweepMaxBarsValid": 10
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "30m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "ICT",
+    "timeframe": "30m",
+    "enabled": true,
+    "algorithmVersion": "ICT-runtime-v4",
+    "parameterVersion": "ICT-30m-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "ICT",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "biasMaxBarsValid": 20,
+        "displacementMaxBarsValid": 5,
+        "entryMaxBarsValid": 20,
+        "fvgSelection": "NEAREST_AFTER_DISPLACEMENT",
+        "higherTimeframe": "1h",
+        "minimumRr": "1",
+        "sweepBiasMode": "OPPOSITE_BIAS",
+        "sweepMaxBarsValid": 10
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "ICT",
+    "timeframe": "1h",
+    "enabled": true,
+    "algorithmVersion": "ICT-runtime-v4",
+    "parameterVersion": "ICT-1h-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "ICT",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "biasMaxBarsValid": 20,
+        "displacementMaxBarsValid": 5,
+        "entryMaxBarsValid": 10,
+        "fvgSelection": "NEAREST_AFTER_DISPLACEMENT",
+        "higherTimeframe": "4h",
+        "minimumRr": "0.8",
+        "sweepBiasMode": "OPPOSITE_BIAS",
+        "sweepMaxBarsValid": 10
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "4h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "ICT",
+    "timeframe": "4h",
+    "enabled": true,
+    "algorithmVersion": "ICT-runtime-v4",
+    "parameterVersion": "ICT-4h-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "ICT",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "biasMaxBarsValid": 20,
+        "displacementMaxBarsValid": 5,
+        "entryMaxBarsValid": 10,
+        "fvgSelection": "NEAREST_AFTER_DISPLACEMENT",
+        "higherTimeframe": "1d",
+        "minimumRr": "0.8",
+        "sweepBiasMode": "OPPOSITE_BIAS",
+        "sweepMaxBarsValid": 10
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1d"
+    ],
+    "minimumHistoryBars": 150,
+    "warmupBars": 50
+  },
+  {
+    "plan": "ICT",
+    "timeframe": "1d",
+    "enabled": true,
+    "algorithmVersion": "ICT-runtime-v4",
+    "parameterVersion": "ICT-1d-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "ICT",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "biasMaxBarsValid": 20,
+        "displacementMaxBarsValid": 5,
+        "entryMaxBarsValid": 10,
+        "fvgSelection": "NEAREST_AFTER_DISPLACEMENT",
+        "higherTimeframe": null,
+        "minimumRr": "0.8",
+        "sweepBiasMode": "OPPOSITE_BIAS",
+        "sweepMaxBarsValid": 10
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 150,
+    "warmupBars": 50
+  },
+  {
+    "plan": "SMC",
+    "timeframe": "1m",
+    "enabled": true,
+    "algorithmVersion": "SMC-runtime-v4",
+    "parameterVersion": "SMC-1m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "SMC",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "higherTimeframe": "5m",
+        "htfMode": "WEIGHTED",
+        "maxBarsValid": 10,
+        "minimumRr": "1",
+        "weightedCountertrendPenalty": "0.2"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "5m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "SMC",
+    "timeframe": "5m",
+    "enabled": true,
+    "algorithmVersion": "SMC-runtime-v4",
+    "parameterVersion": "SMC-5m-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "SMC",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "higherTimeframe": "15m",
+        "htfMode": "STRICT",
+        "maxBarsValid": 10,
+        "minimumRr": "1.5",
+        "weightedCountertrendPenalty": "0.2"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "15m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "SMC",
+    "timeframe": "15m",
+    "enabled": true,
+    "algorithmVersion": "SMC-runtime-v4",
+    "parameterVersion": "SMC-15m-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "SMC",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "higherTimeframe": "30m",
+        "htfMode": "STRICT",
+        "maxBarsValid": 10,
+        "minimumRr": "1.5",
+        "weightedCountertrendPenalty": "0.2"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "30m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "SMC",
+    "timeframe": "30m",
+    "enabled": true,
+    "algorithmVersion": "SMC-runtime-v4",
+    "parameterVersion": "SMC-30m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "SMC",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "higherTimeframe": "1h",
+        "htfMode": "WEIGHTED",
+        "maxBarsValid": 10,
+        "minimumRr": "1",
+        "weightedCountertrendPenalty": "0.2"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "SMC",
+    "timeframe": "1h",
+    "enabled": true,
+    "algorithmVersion": "SMC-runtime-v4",
+    "parameterVersion": "SMC-1h-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "SMC",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "higherTimeframe": "4h",
+        "htfMode": "WEIGHTED",
+        "maxBarsValid": 10,
+        "minimumRr": "1",
+        "weightedCountertrendPenalty": "0.2"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "4h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "SMC",
+    "timeframe": "4h",
+    "enabled": true,
+    "algorithmVersion": "SMC-runtime-v4",
+    "parameterVersion": "SMC-4h-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "SMC",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "higherTimeframe": "1d",
+        "htfMode": "WEIGHTED",
+        "maxBarsValid": 10,
+        "minimumRr": "1",
+        "weightedCountertrendPenalty": "0.2"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1d"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "SMC",
+    "timeframe": "1d",
+    "enabled": true,
+    "algorithmVersion": "SMC-runtime-v4",
+    "parameterVersion": "SMC-1d-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "SMC",
+      "parameters": {
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "higherTimeframe": null,
+        "htfMode": "OFF",
+        "maxBarsValid": 10,
+        "minimumRr": "1",
+        "weightedCountertrendPenalty": "0.2"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "RSI",
+    "timeframe": "1m",
+    "enabled": true,
+    "algorithmVersion": "RSI-runtime-v4",
+    "parameterVersion": "RSI-1m-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "RSI",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "confirmedSwingLookback": 50,
+        "divergenceRequired": false,
+        "maxBarsValid": 10,
+        "maximumPivotDistance": 20,
+        "minimumPivotDistance": 2,
+        "overboughtThreshold": "65",
+        "oversoldThreshold": "35",
+        "rsiPeriod": 14,
+        "targetRr": "1.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "5m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "RSI",
+    "timeframe": "5m",
+    "enabled": true,
+    "algorithmVersion": "RSI-runtime-v4",
+    "parameterVersion": "RSI-5m-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "RSI",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "confirmedSwingLookback": 50,
+        "divergenceRequired": false,
+        "maxBarsValid": 10,
+        "maximumPivotDistance": 20,
+        "minimumPivotDistance": 2,
+        "overboughtThreshold": "70",
+        "oversoldThreshold": "30",
+        "rsiPeriod": 14,
+        "targetRr": "1.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "15m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "RSI",
+    "timeframe": "15m",
+    "enabled": true,
+    "algorithmVersion": "RSI-runtime-v4",
+    "parameterVersion": "RSI-15m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "RSI",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "confirmedSwingLookback": 50,
+        "divergenceRequired": false,
+        "maxBarsValid": 10,
+        "maximumPivotDistance": 20,
+        "minimumPivotDistance": 2,
+        "overboughtThreshold": "70",
+        "oversoldThreshold": "30",
+        "rsiPeriod": 14,
+        "targetRr": "1.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "30m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "RSI",
+    "timeframe": "30m",
+    "enabled": true,
+    "algorithmVersion": "RSI-runtime-v4",
+    "parameterVersion": "RSI-30m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "RSI",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "confirmedSwingLookback": 50,
+        "divergenceRequired": false,
+        "maxBarsValid": 10,
+        "maximumPivotDistance": 20,
+        "minimumPivotDistance": 2,
+        "overboughtThreshold": "70",
+        "oversoldThreshold": "30",
+        "rsiPeriod": 14,
+        "targetRr": "1.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "RSI",
+    "timeframe": "1h",
+    "enabled": true,
+    "algorithmVersion": "RSI-runtime-v4",
+    "parameterVersion": "RSI-1h-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "RSI",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "confirmedSwingLookback": 50,
+        "divergenceRequired": false,
+        "maxBarsValid": 10,
+        "maximumPivotDistance": 20,
+        "minimumPivotDistance": 2,
+        "overboughtThreshold": "70",
+        "oversoldThreshold": "30",
+        "rsiPeriod": 14,
+        "targetRr": "1.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "4h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "RSI",
+    "timeframe": "4h",
+    "enabled": true,
+    "algorithmVersion": "RSI-runtime-v4",
+    "parameterVersion": "RSI-4h-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "RSI",
+      "parameters": {
+        "atrBufferMultiplier": "0.35",
+        "atrPeriod": 14,
+        "confirmedSwingLookback": 50,
+        "divergenceRequired": false,
+        "maxBarsValid": 10,
+        "maximumPivotDistance": 20,
+        "minimumPivotDistance": 2,
+        "overboughtThreshold": "65",
+        "oversoldThreshold": "35",
+        "rsiPeriod": 14,
+        "targetRr": "1.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1d"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "RSI",
+    "timeframe": "1d",
+    "enabled": true,
+    "algorithmVersion": "RSI-runtime-v4",
+    "parameterVersion": "RSI-1d-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "RSI",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "confirmedSwingLookback": 50,
+        "divergenceRequired": false,
+        "maxBarsValid": 10,
+        "maximumPivotDistance": 20,
+        "minimumPivotDistance": 2,
+        "overboughtThreshold": "70",
+        "oversoldThreshold": "30",
+        "rsiPeriod": 14,
+        "targetRr": "1.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "QUASIMODO",
+    "timeframe": "1m",
+    "enabled": true,
+    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "parameterVersion": "QUASIMODO-1m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "QUASIMODO",
+      "parameters": {
+        "atrBufferMultiplier": "0.35",
+        "atrPeriod": 14,
+        "maxBarsValid": 10,
+        "maxEntryDistanceAtr": "5",
+        "maxStructureAgeBars": 10,
+        "minimumRr": "1.5",
+        "minimumZoneTicks": 5,
+        "toleranceAtrMultiplier": "0.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "5m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "QUASIMODO",
+    "timeframe": "5m",
+    "enabled": true,
+    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "parameterVersion": "QUASIMODO-5m-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "QUASIMODO",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "maxBarsValid": 10,
+        "maxEntryDistanceAtr": "5",
+        "maxStructureAgeBars": 5,
+        "minimumRr": "1.5",
+        "minimumZoneTicks": 5,
+        "toleranceAtrMultiplier": "0.2"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "15m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "QUASIMODO",
+    "timeframe": "15m",
+    "enabled": true,
+    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "parameterVersion": "QUASIMODO-15m-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "QUASIMODO",
+      "parameters": {
+        "atrBufferMultiplier": "0.35",
+        "atrPeriod": 14,
+        "maxBarsValid": 10,
+        "maxEntryDistanceAtr": "3",
+        "maxStructureAgeBars": 10,
+        "minimumRr": "1.5",
+        "minimumZoneTicks": 5,
+        "toleranceAtrMultiplier": "0.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "30m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "QUASIMODO",
+    "timeframe": "30m",
+    "enabled": true,
+    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "parameterVersion": "QUASIMODO-30m-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "QUASIMODO",
+      "parameters": {
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "maxBarsValid": 10,
+        "maxEntryDistanceAtr": "5",
+        "maxStructureAgeBars": 10,
+        "minimumRr": "1.5",
+        "minimumZoneTicks": 5,
+        "toleranceAtrMultiplier": "0.35"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "QUASIMODO",
+    "timeframe": "1h",
+    "enabled": true,
+    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "parameterVersion": "QUASIMODO-1h-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "QUASIMODO",
+      "parameters": {
+        "atrBufferMultiplier": "0.35",
+        "atrPeriod": 14,
+        "maxBarsValid": 10,
+        "maxEntryDistanceAtr": "5",
+        "maxStructureAgeBars": 10,
+        "minimumRr": "1.5",
+        "minimumZoneTicks": 5,
+        "toleranceAtrMultiplier": "0.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "4h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "QUASIMODO",
+    "timeframe": "4h",
+    "enabled": true,
+    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "parameterVersion": "QUASIMODO-4h-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "QUASIMODO",
+      "parameters": {
+        "atrBufferMultiplier": "0.35",
+        "atrPeriod": 14,
+        "maxBarsValid": 10,
+        "maxEntryDistanceAtr": "5",
+        "maxStructureAgeBars": 10,
+        "minimumRr": "1.5",
+        "minimumZoneTicks": 5,
+        "toleranceAtrMultiplier": "0.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1d"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "QUASIMODO",
+    "timeframe": "1d",
+    "enabled": true,
+    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "parameterVersion": "QUASIMODO-1d-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "QUASIMODO",
+      "parameters": {
+        "atrBufferMultiplier": "0.35",
+        "atrPeriod": 14,
+        "maxBarsValid": 10,
+        "maxEntryDistanceAtr": "5",
+        "maxStructureAgeBars": 10,
+        "minimumRr": "1.5",
+        "minimumZoneTicks": 5,
+        "toleranceAtrMultiplier": "0.5"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "TREND_BREAKOUT",
+    "timeframe": "1m",
+    "enabled": true,
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "parameterVersion": "TREND_BREAKOUT-1m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "TREND_BREAKOUT",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrPeriod": 14,
+        "chandelierAtrMultiplier": "3",
+        "chandelierPeriod": 22,
+        "donchianPeriod": 20,
+        "emaPeriod": 50,
+        "higherTimeframe": "5m",
+        "initialStopAtrMultiplier": "2",
+        "minimumAdx": "20",
+        "targetRr": "2",
+        "trailingActivationR": "0.75"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "5m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "TREND_BREAKOUT",
+    "timeframe": "5m",
+    "enabled": true,
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "parameterVersion": "TREND_BREAKOUT-5m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "TREND_BREAKOUT",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrPeriod": 14,
+        "chandelierAtrMultiplier": "3",
+        "chandelierPeriod": 22,
+        "donchianPeriod": 20,
+        "emaPeriod": 50,
+        "higherTimeframe": "15m",
+        "initialStopAtrMultiplier": "1.5",
+        "minimumAdx": "20",
+        "targetRr": "1.5",
+        "trailingActivationR": "0.75"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "15m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "TREND_BREAKOUT",
+    "timeframe": "15m",
+    "enabled": true,
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "parameterVersion": "TREND_BREAKOUT-15m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "TREND_BREAKOUT",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrPeriod": 14,
+        "chandelierAtrMultiplier": "3",
+        "chandelierPeriod": 22,
+        "donchianPeriod": 20,
+        "emaPeriod": 50,
+        "higherTimeframe": null,
+        "initialStopAtrMultiplier": "2",
+        "minimumAdx": "20",
+        "targetRr": "2",
+        "trailingActivationR": "0.75"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "30m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "TREND_BREAKOUT",
+    "timeframe": "30m",
+    "enabled": true,
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "parameterVersion": "TREND_BREAKOUT-30m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "TREND_BREAKOUT",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrPeriod": 14,
+        "chandelierAtrMultiplier": "3",
+        "chandelierPeriod": 22,
+        "donchianPeriod": 20,
+        "emaPeriod": 50,
+        "higherTimeframe": "1h",
+        "initialStopAtrMultiplier": "2",
+        "minimumAdx": "25",
+        "targetRr": "2",
+        "trailingActivationR": "1"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "TREND_BREAKOUT",
+    "timeframe": "1h",
+    "enabled": true,
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "parameterVersion": "TREND_BREAKOUT-1h-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "TREND_BREAKOUT",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrPeriod": 14,
+        "chandelierAtrMultiplier": "3",
+        "chandelierPeriod": 22,
+        "donchianPeriod": 20,
+        "emaPeriod": 50,
+        "higherTimeframe": null,
+        "initialStopAtrMultiplier": "2",
+        "minimumAdx": "25",
+        "targetRr": "1.5",
+        "trailingActivationR": "0.75"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "4h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "TREND_BREAKOUT",
+    "timeframe": "4h",
+    "enabled": true,
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "parameterVersion": "TREND_BREAKOUT-4h-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "TREND_BREAKOUT",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrPeriod": 14,
+        "chandelierAtrMultiplier": "3",
+        "chandelierPeriod": 22,
+        "donchianPeriod": 20,
+        "emaPeriod": 50,
+        "higherTimeframe": null,
+        "initialStopAtrMultiplier": "1.5",
+        "minimumAdx": "20",
+        "targetRr": "2",
+        "trailingActivationR": "0.75"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1d"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "TREND_BREAKOUT",
+    "timeframe": "1d",
+    "enabled": true,
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "parameterVersion": "TREND_BREAKOUT-1d-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "TREND_BREAKOUT",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrPeriod": 14,
+        "chandelierAtrMultiplier": "3",
+        "chandelierPeriod": 22,
+        "donchianPeriod": 20,
+        "emaPeriod": 50,
+        "higherTimeframe": null,
+        "initialStopAtrMultiplier": "2",
+        "minimumAdx": "25",
+        "targetRr": "2",
+        "trailingActivationR": "1"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "MEAN_REVERSION",
+    "timeframe": "1m",
+    "enabled": true,
+    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "parameterVersion": "MEAN_REVERSION-1m-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "MEAN_REVERSION",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "bollingerDeviation": "2",
+        "bollingerPeriod": 20,
+        "extremeZscore": "1.5",
+        "maxBarsValid": 10,
+        "maximumAdx": "20",
+        "maximumBandwidth": "0.05",
+        "minimumRr": "1",
+        "zscorePeriod": 20
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "5m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "MEAN_REVERSION",
+    "timeframe": "5m",
+    "enabled": true,
+    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "parameterVersion": "MEAN_REVERSION-5m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "MEAN_REVERSION",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrBufferMultiplier": "0.05",
+        "atrPeriod": 14,
+        "bollingerDeviation": "2",
+        "bollingerPeriod": 20,
+        "extremeZscore": "1.5",
+        "maxBarsValid": 10,
+        "maximumAdx": "20",
+        "maximumBandwidth": "0.05",
+        "minimumRr": "0.8",
+        "zscorePeriod": 20
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "15m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "MEAN_REVERSION",
+    "timeframe": "15m",
+    "enabled": true,
+    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "parameterVersion": "MEAN_REVERSION-15m-runtime-v2-pp1-pc1",
+    "parameters": {
+      "kind": "MEAN_REVERSION",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "bollingerDeviation": "2",
+        "bollingerPeriod": 20,
+        "extremeZscore": "1.5",
+        "maxBarsValid": 10,
+        "maximumAdx": "25",
+        "maximumBandwidth": "0.05",
+        "minimumRr": "1",
+        "zscorePeriod": 20
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "30m"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "MEAN_REVERSION",
+    "timeframe": "30m",
+    "enabled": true,
+    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "parameterVersion": "MEAN_REVERSION-30m-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "MEAN_REVERSION",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "bollingerDeviation": "2",
+        "bollingerPeriod": 20,
+        "extremeZscore": "2",
+        "maxBarsValid": 10,
+        "maximumAdx": "25",
+        "maximumBandwidth": "0.05",
+        "minimumRr": "1",
+        "zscorePeriod": 20
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "MEAN_REVERSION",
+    "timeframe": "1h",
+    "enabled": true,
+    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "parameterVersion": "MEAN_REVERSION-1h-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "MEAN_REVERSION",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "bollingerDeviation": "2",
+        "bollingerPeriod": 20,
+        "extremeZscore": "2",
+        "maxBarsValid": 10,
+        "maximumAdx": "25",
+        "maximumBandwidth": "0.05",
+        "minimumRr": "1",
+        "zscorePeriod": 20
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "4h"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "MEAN_REVERSION",
+    "timeframe": "4h",
+    "enabled": true,
+    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "parameterVersion": "MEAN_REVERSION-4h-runtime-v3-pp1-pc1",
+    "parameters": {
+      "kind": "MEAN_REVERSION",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrBufferMultiplier": "0.1",
+        "atrPeriod": 14,
+        "bollingerDeviation": "2",
+        "bollingerPeriod": 20,
+        "extremeZscore": "1.5",
+        "maxBarsValid": 10,
+        "maximumAdx": "25",
+        "maximumBandwidth": "0.05",
+        "minimumRr": "1",
+        "zscorePeriod": 20
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [
+      "1d"
+    ],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "MEAN_REVERSION",
+    "timeframe": "1d",
+    "enabled": true,
+    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "parameterVersion": "MEAN_REVERSION-1d-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "MEAN_REVERSION",
+      "parameters": {
+        "adxPeriod": 14,
+        "atrBufferMultiplier": "0.2",
+        "atrPeriod": 14,
+        "bollingerDeviation": "2",
+        "bollingerPeriod": 20,
+        "extremeZscore": "2",
+        "maxBarsValid": 10,
+        "maximumAdx": "25",
+        "maximumBandwidth": "0.05",
+        "minimumRr": "1",
+        "zscorePeriod": 20
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  }
+]
