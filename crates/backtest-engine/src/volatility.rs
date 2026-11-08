@@ -14,7 +14,8 @@ use std::collections::BTreeSet;
 
 /// Shared with the app's display-only forecast; one definition for both.
 pub use analysis_core::range_forecast::{
-    HORIZON_BARS, Lookbacks, RangeForecast, RangeModel, VOL_VERSION, har_features, new_york_slot,
+    EventKind, HORIZON_BARS, Lookbacks, MacroEvent, MacroEventRow, MacroEventsFile, RangeForecast,
+    RangeModel, VOL_VERSION, event_terms_between, events_between, har_features, new_york_slot,
     relative_true_ranges, seasonal_feature,
 };
 
@@ -716,98 +717,14 @@ pub fn vault_scores(
 // --- vol-v3: scheduled-event terms. See
 // `docs/superpowers/specs/2026-11-08-event-aware-range-forecast-design.md`.
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum EventKind {
-    Nfp,
-    Cpi,
-    Fomc,
-}
-
-impl EventKind {
-    pub const ALL: [Self; 3] = [Self::Nfp, Self::Cpi, Self::Fomc];
-
-    fn parse(name: &str) -> Option<Self> {
-        match name {
-            "NFP" => Some(Self::Nfp),
-            "CPI" => Some(Self::Cpi),
-            "FOMC" => Some(Self::Fomc),
-            _ => None,
-        }
-    }
-}
-
-/// One scheduled event; a point when `start == end`, else an interval (FOMC).
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct MacroEvent {
-    pub kind: EventKind,
-    pub start: i64,
-    pub end: i64,
-}
-
-/// `config/macro-events.json` as written by `scripts/research/build_macro_events.py`.
-#[derive(Clone, Debug, serde::Deserialize)]
-pub struct MacroEventsFile {
-    pub version: String,
-    pub events: Vec<MacroEventRow>,
-}
-
-#[derive(Clone, Debug, serde::Deserialize)]
-pub struct MacroEventRow {
-    #[serde(rename = "type")]
-    pub kind: String,
-    pub start: String,
-    pub end: String,
-}
-
-impl MacroEventsFile {
-    /// Events in milliseconds, sorted by start; any unknown type or bad time is an error.
-    pub fn events(&self) -> Result<Vec<MacroEvent>, String> {
-        let millis = |text: &str| {
-            DateTime::parse_from_rfc3339(text)
-                .map(|time| time.timestamp_millis())
-                .map_err(|error| format!("bad event time {text}: {error}"))
-        };
-        let mut events = self
-            .events
-            .iter()
-            .map(|row| {
-                let kind = EventKind::parse(&row.kind)
-                    .ok_or_else(|| format!("unknown event type {}", row.kind))?;
-                let (start, end) = (millis(&row.start)?, millis(&row.end)?);
-                if end < start {
-                    return Err(format!("event ends before it starts: {}", row.start));
-                }
-                Ok(MacroEvent { kind, start, end })
-            })
-            .collect::<Result<Vec<_>, String>>()?;
-        events.sort_by_key(|event| (event.start, event.end));
-        Ok(events)
-    }
-}
-
 /// `d_nfp`, `d_cpi`, `d_fomc` of one origin: 1 when an event of that kind touches
 /// the horizon from the open of bar `index` to the close of bar `index + H - 1`.
 pub fn event_terms(candles: &[Candle], origin: &Origin, events: &[MacroEvent]) -> [f64; 3] {
-    let from = candles[origin.index].open_time;
-    let to = candles[origin.index + HORIZON_BARS - 1].close_time;
-    let longest = events
-        .iter()
-        .map(|event| event.end - event.start)
-        .max()
-        .unwrap_or(0);
-    let first = events.partition_point(|event| event.start < from - longest);
-    let last = events.partition_point(|event| event.start <= to);
-    let mut terms = [0.0; 3];
-    for event in &events[first..last] {
-        if event.end >= from {
-            let slot = EventKind::ALL
-                .iter()
-                .position(|kind| *kind == event.kind)
-                .expect("known kind");
-            terms[slot] = 1.0;
-        }
-    }
-    terms
+    event_terms_between(
+        events,
+        candles[origin.index].open_time,
+        candles[origin.index + HORIZON_BARS - 1].close_time,
+    )
 }
 
 /// Per window: the vol-v3 candidate against `HAR_RANGE_SEASONAL`, split into
@@ -937,4 +854,119 @@ pub fn evaluate_events(
         lines.push(line);
     }
     Ok(lines)
+}
+
+/// The vol-v3 candidate frozen before the vault: eight coefficients, and the
+/// `HAR_RANGE_SEASONAL` fit (with its profile) of the same origins as its baseline.
+#[derive(Clone, Debug, PartialEq, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventModel {
+    pub vol_version: String,
+    pub symbol: String,
+    pub timeframe: String,
+    pub horizon_bars: usize,
+    pub calendar_version: String,
+    /// HAR_RANGE_SEASONAL terms, then d_nfp, d_cpi, d_fomc.
+    pub coefficients: Vec<f64>,
+    pub seasonal_coefficients: Vec<f64>,
+    pub profile: Vec<f64>,
+    pub origins: usize,
+}
+
+/// `fit_seasonal` on `members`, plus the candidate with event terms on the same rows.
+pub fn fit_seasonal_events(
+    candles: &[Candle],
+    origins: &[Origin],
+    members: &[usize],
+    timeframe: Timeframe,
+    events: &[MacroEvent],
+) -> Option<(SeasonalFit, Vec<f64>)> {
+    let seasonal = fit_seasonal(candles, origins, members, timeframe)?;
+    let (mut rows, mut targets) = (Vec::new(), Vec::new());
+    for member in members {
+        let origin = &origins[*member];
+        let Some(ln_season) = seasonal_feature(
+            &seasonal.profile,
+            &horizon_opens(candles, origin),
+            timeframe,
+        ) else {
+            continue;
+        };
+        let mut row = vec![1.0, origin.ln_rd, origin.ln_rw, origin.ln_rm, ln_season];
+        row.extend_from_slice(&event_terms(candles, origin, events));
+        rows.push(row);
+        targets.push(origin.target);
+    }
+    let coefficients = least_squares(&rows, &targets)?;
+    Some((seasonal, coefficients))
+}
+
+/// The vol-v3 fit on every origin before the vault (all research windows).
+pub fn event_fit_before_vault(
+    candles: &[Candle],
+    atr: &[Option<Decimal>],
+    ready_at_close: &[bool],
+    windows: &ResearchWindows,
+    timeframe: Timeframe,
+    events: &[MacroEvent],
+) -> Result<Option<(SeasonalFit, Vec<f64>)>, VolError> {
+    let origins = collect_origins(candles, atr, ready_at_close, windows, timeframe)?.origins;
+    let all: Vec<usize> = (0..origins.len()).collect();
+    Ok(fit_seasonal_events(
+        candles, &origins, &all, timeframe, events,
+    ))
+}
+
+/// Vault residuals of the frozen vol-v3 candidate and of its seasonal baseline,
+/// with each origin's event flag.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventVaultScores {
+    pub origins: usize,
+    pub open_times: Vec<i64>,
+    pub event_horizon: Vec<bool>,
+    pub residuals: Vec<f64>,
+    pub baseline_residuals: Vec<f64>,
+}
+
+pub fn vault_event_scores(
+    candles: &[Candle],
+    origins: &[Origin],
+    model: &EventModel,
+    events: &[MacroEvent],
+    timeframe: Timeframe,
+) -> EventVaultScores {
+    let mut scores = EventVaultScores {
+        origins: 0,
+        open_times: Vec::new(),
+        event_horizon: Vec::new(),
+        residuals: Vec::new(),
+        baseline_residuals: Vec::new(),
+    };
+    let dot = |weights: &[f64], values: &[f64]| -> f64 {
+        weights.iter().zip(values).map(|(w, v)| w * v).sum()
+    };
+    for origin in origins {
+        let Some(ln_season) =
+            seasonal_feature(&model.profile, &horizon_opens(candles, origin), timeframe)
+        else {
+            continue;
+        };
+        let seasonal = [1.0, origin.ln_rd, origin.ln_rw, origin.ln_rm, ln_season];
+        let terms = event_terms(candles, origin, events);
+        let mut full = seasonal.to_vec();
+        full.extend_from_slice(&terms);
+        scores.origins += 1;
+        scores.open_times.push(candles[origin.index].open_time);
+        scores
+            .event_horizon
+            .push(terms.iter().any(|term| *term > 0.0));
+        scores
+            .residuals
+            .push(origin.target - dot(&model.coefficients, &full));
+        scores
+            .baseline_residuals
+            .push(origin.target - dot(&model.seasonal_coefficients, &seasonal));
+    }
+    scores
 }

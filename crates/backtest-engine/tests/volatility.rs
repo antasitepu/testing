@@ -1,10 +1,10 @@
 use backtest_engine::edge::{ResearchWindow, ResearchWindows, SplitMix64};
 use backtest_engine::volatility::{
-    EventKind, HORIZON_BARS, Lookbacks, MIN_SLOT_ORIGINS, MacroEvent, MacroEventsFile, Origin,
-    RangeModel, apply_profile, band_report, collect_origins, evaluate, evaluate_events,
-    event_terms, fit_seasonal, har_features, least_squares, new_york_slot, quantile,
-    relative_true_ranges, seasonal_feature, seasonal_profile, vault_scores, vault_trading_days,
-    vault_windows,
+    EventKind, EventModel, HORIZON_BARS, Lookbacks, MIN_SLOT_ORIGINS, MacroEvent, MacroEventsFile,
+    Origin, RangeModel, apply_profile, band_report, collect_origins, evaluate, evaluate_events,
+    event_fit_before_vault, event_terms, fit_seasonal, har_features, least_squares, new_york_slot,
+    quantile, relative_true_ranges, seasonal_feature, seasonal_profile, vault_event_scores,
+    vault_scores, vault_trading_days, vault_windows,
 };
 use chrono::{TimeZone, Utc};
 use market_domain::{Candle, Symbol, Timeframe};
@@ -744,4 +744,110 @@ fn evaluate_events_keeps_the_vol_v1_baseline_and_splits_event_horizons() {
         }
         assert!(!line.daily_loss_diff_event.is_empty());
     }
+}
+
+fn synthetic_calendar(candles: &[Candle]) -> Vec<MacroEvent> {
+    let mut events = Vec::new();
+    for (kind, offset) in [(EventKind::Nfp, 3), (EventKind::Cpi, 5)] {
+        for day in (offset..candles.len() / 96).step_by(7) {
+            let time = candles[96 * day].open_time + 13 * HOUR + 30 * 60_000;
+            events.push(MacroEvent {
+                kind,
+                start: time,
+                end: time,
+            });
+        }
+    }
+    for day in (10..candles.len() / 96).step_by(28) {
+        let start = candles[96 * day].open_time + 17 * HOUR;
+        events.push(MacroEvent {
+            kind: EventKind::Fomc,
+            start,
+            end: start + 105 * 60_000,
+        });
+    }
+    events.sort_by_key(|event| event.start);
+    events
+}
+
+#[test]
+fn the_pre_vault_event_fit_shares_its_seasonal_part_with_the_vol_v2_refit() {
+    let candles = synthetic_quarters(120);
+    let count = candles.len();
+    let windows = ResearchWindows {
+        train_start: candles[0].open_time,
+        validation_start: candles[96 * 70].open_time,
+        test_start: candles[96 * 95].open_time,
+        vault_start: candles[count - 1].open_time + HOUR,
+    };
+    let atr: Vec<Option<Decimal>> = (0..count)
+        .map(|index| (index >= 13).then(|| candles[index].high - candles[index].low))
+        .collect();
+    let ready = vec![true; count];
+    let events = synthetic_calendar(&candles);
+    let (seasonal, coefficients) =
+        event_fit_before_vault(&candles, &atr, &ready, &windows, Timeframe::M15, &events)
+            .unwrap()
+            .unwrap();
+    let refit = band_report(&candles, &atr, &ready, &windows, Timeframe::M15)
+        .unwrap()
+        .unwrap()
+        .refit;
+    assert_eq!(seasonal, refit);
+    assert_eq!(coefficients.len(), 8);
+
+    // Scored on the last stretch as if it were the vault, exactly as frozen.
+    let model = EventModel {
+        vol_version: "vol-v3".to_owned(),
+        symbol: "XAUUSDT".to_owned(),
+        timeframe: "15m".to_owned(),
+        horizon_bars: HORIZON_BARS,
+        calendar_version: "test".to_owned(),
+        coefficients: coefficients.clone(),
+        seasonal_coefficients: seasonal.coefficients.clone(),
+        profile: seasonal.profile.clone(),
+        origins: seasonal.origins,
+    };
+    let vault_start = candles[96 * 100].open_time;
+    let vault = collect_origins(
+        &candles,
+        &atr,
+        &ready,
+        &vault_windows(vault_start),
+        Timeframe::M15,
+    )
+    .unwrap()
+    .origins;
+    let scores = vault_event_scores(&candles, &vault, &model, &events, Timeframe::M15);
+    assert_eq!(scores.origins, vault.len());
+    let position = scores
+        .event_horizon
+        .iter()
+        .position(|flag| *flag)
+        .expect("an event horizon in the vault stretch");
+    let origin = &vault[position];
+    let opens: Vec<i64> = candles[origin.index..origin.index + HORIZON_BARS]
+        .iter()
+        .map(|candle| candle.open_time)
+        .collect();
+    let ln_season = seasonal_feature(&model.profile, &opens, Timeframe::M15).unwrap();
+    let terms = event_terms(&candles, origin, &events);
+    let row = [
+        1.0,
+        origin.ln_rd,
+        origin.ln_rw,
+        origin.ln_rm,
+        ln_season,
+        terms[0],
+        terms[1],
+        terms[2],
+    ];
+    let forecast: f64 = row.iter().zip(&coefficients).map(|(v, w)| v * w).sum();
+    assert!((scores.residuals[position] - (origin.target - forecast)).abs() < 1e-12);
+    let baseline: f64 = row[..5]
+        .iter()
+        .zip(&seasonal.coefficients)
+        .map(|(v, w)| v * w)
+        .sum();
+    assert!((scores.baseline_residuals[position] - (origin.target - baseline)).abs() < 1e-12);
 }

@@ -130,15 +130,9 @@ fn print_volatility(
     }
     // vol-v3: scheduled-event terms from config/macro-events.json (public domain).
     if std::env::var("GOLD_BASELINE_VOL_EVENTS").as_deref() == Ok("1") {
-        let path =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/macro-events.json");
-        let text = std::fs::read_to_string(&path)
-            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-        let file: volatility::MacroEventsFile =
-            serde_json::from_str(&text).expect("macro events JSON");
-        let events = file.events().expect("valid macro events");
+        let (calendar_version, events) = load_macro_events();
         let mut calendar = identity.clone();
-        calendar["calendarVersion"] = json!(file.version);
+        calendar["calendarVersion"] = json!(calendar_version);
         calendar["events"] = json!(events.len());
         println!("VOL_EVENTS_CALENDAR,{calendar}");
         for line in
@@ -151,6 +145,29 @@ fn print_volatility(
             }
             println!("VOL_EVENTS,{value}");
         }
+    }
+    // vol-v3 on XAUUSDT: the fit on every origin before the vault, frozen for the
+    // vault check. No window is scored, so no XAUUSDT event statistic is printed.
+    if std::env::var("GOLD_BASELINE_VOL_EVENTS_FIT").as_deref() == Ok("1") {
+        let (calendar_version, events) = load_macro_events();
+        let (seasonal, coefficients) = volatility::event_fit_before_vault(
+            candles,
+            &atr,
+            &ready_at_close,
+            windows,
+            timeframe,
+            &events,
+        )
+        .expect("vol-v3 fit")
+        .expect("vol-v3 fit is solvable");
+        let mut value = identity.clone();
+        value["volVersion"] = json!("vol-v3");
+        value["calendarVersion"] = json!(calendar_version);
+        value["coefficients"] = json!(coefficients);
+        value["seasonalCoefficients"] = json!(seasonal.coefficients);
+        value["profile"] = json!(seasonal.profile);
+        value["origins"] = json!(seasonal.origins);
+        println!("VOL_EVENTS_FIT,{value}");
     }
     // vol-v2: band quantiles and the refit candidate; no vault candle is a target.
     if std::env::var("GOLD_BASELINE_VOL_BAND").as_deref() == Ok("1") {
@@ -257,6 +274,44 @@ fn print_vault_check(
         value["tradingDays"] = json!(trading_days);
         println!("VOL_VAULT,{value}");
     }
+    // vol-v3 on the same vault: the frozen candidate against its seasonal baseline.
+    let file = "range-forecast-xauusdt-15m-vol-v3-candidate.json";
+    let path = std::env::var("GOLD_VAULT_EVENTS_MODEL")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../research/models")
+                .join(file)
+        });
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+    let model: volatility::EventModel = serde_json::from_str(&text).expect("vol-v3 model JSON");
+    let (calendar_version, events) = load_macro_events();
+    assert_eq!(
+        model.calendar_version, calendar_version,
+        "calendar changed since the fit"
+    );
+    let scores = volatility::vault_event_scores(candles, &origins, &model, &events, timeframe);
+    let mut value = serde_json::to_value(&scores).expect("vault event scores");
+    value["symbol"] = json!(symbol);
+    value["timeframe"] = json!(timeframe.as_str());
+    value["model"] = json!("events");
+    value["modelFile"] = json!(file);
+    value["vaultStart"] = json!(vault_start);
+    value["cutoff"] = json!(cutoff);
+    value["tradingDays"] = json!(trading_days);
+    println!("VOL_VAULT_EVENTS,{value}");
+}
+
+/// `config/macro-events.json`, read at run time: its version and sorted events.
+fn load_macro_events() -> (String, Vec<volatility::MacroEvent>) {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/macro-events.json");
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+    let file: volatility::MacroEventsFile = serde_json::from_str(&text).expect("macro events JSON");
+    let events = file.events().expect("valid macro events");
+    (file.version, events)
 }
 
 /// Scores one hypothesis with edge-v1, with the research readiness above.

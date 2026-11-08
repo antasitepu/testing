@@ -200,7 +200,13 @@ jobs:
             export GOLD_BASELINE_HYPOTHESES="$PLAN"
             unset GOLD_BASELINE_PLANS
           elif [[ "$PLAN" == VOL_EVENTS ]]; then
-            export GOLD_BASELINE_VOLATILITY=1 GOLD_BASELINE_VOL_EVENTS=1
+            export GOLD_BASELINE_VOLATILITY=1
+            # XAUUSDT only freezes the pre-vault fit (vol-v3 spec); XAUUSD is scored.
+            if [[ "$GOLD_BASELINE_SYMBOL" == XAUUSDT ]]; then
+              export GOLD_BASELINE_VOL_EVENTS_FIT=1
+            else
+              export GOLD_BASELINE_VOL_EVENTS=1
+            fi
             unset GOLD_BASELINE_PLANS
           elif [[ "$PLAN" == VOL_FORECAST ]]; then
             export GOLD_BASELINE_VOLATILITY=1

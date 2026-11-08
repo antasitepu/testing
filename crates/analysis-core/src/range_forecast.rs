@@ -207,3 +207,112 @@ impl RangeModel {
         })
     }
 }
+
+// --- Scheduled US releases (vol-v3). See
+// `docs/superpowers/specs/2026-11-08-event-aware-range-forecast-design.md`.
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EventKind {
+    Nfp,
+    Cpi,
+    Fomc,
+}
+
+impl EventKind {
+    pub const ALL: [Self; 3] = [Self::Nfp, Self::Cpi, Self::Fomc];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Nfp => "NFP",
+            Self::Cpi => "CPI",
+            Self::Fomc => "FOMC",
+        }
+    }
+
+    fn parse(name: &str) -> Option<Self> {
+        match name {
+            "NFP" => Some(Self::Nfp),
+            "CPI" => Some(Self::Cpi),
+            "FOMC" => Some(Self::Fomc),
+            _ => None,
+        }
+    }
+}
+
+/// One scheduled event; a point when `start == end`, else an interval (FOMC).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MacroEvent {
+    pub kind: EventKind,
+    pub start: i64,
+    pub end: i64,
+}
+
+/// `config/macro-events.json` as written by `scripts/research/build_macro_events.py`.
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct MacroEventsFile {
+    pub version: String,
+    pub events: Vec<MacroEventRow>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct MacroEventRow {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub start: String,
+    pub end: String,
+}
+
+impl MacroEventsFile {
+    /// Events in milliseconds, sorted by start; any unknown type or bad time is an error.
+    pub fn events(&self) -> Result<Vec<MacroEvent>, String> {
+        let millis = |text: &str| {
+            DateTime::parse_from_rfc3339(text)
+                .map(|time| time.timestamp_millis())
+                .map_err(|error| format!("bad event time {text}: {error}"))
+        };
+        let mut events = self
+            .events
+            .iter()
+            .map(|row| {
+                let kind = EventKind::parse(&row.kind)
+                    .ok_or_else(|| format!("unknown event type {}", row.kind))?;
+                let (start, end) = (millis(&row.start)?, millis(&row.end)?);
+                if end < start {
+                    return Err(format!("event ends before it starts: {}", row.start));
+                }
+                Ok(MacroEvent { kind, start, end })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        events.sort_by_key(|event| (event.start, event.end));
+        Ok(events)
+    }
+}
+
+/// Events touching `[from, to]`: points inside it, or intervals overlapping it.
+/// `events` must be sorted by start, as `MacroEventsFile::events` returns them.
+pub fn events_between(events: &[MacroEvent], from: i64, to: i64) -> Vec<&MacroEvent> {
+    let longest = events
+        .iter()
+        .map(|event| event.end - event.start)
+        .max()
+        .unwrap_or(0);
+    let first = events.partition_point(|event| event.start < from - longest);
+    let last = events.partition_point(|event| event.start <= to);
+    events[first..last]
+        .iter()
+        .filter(|event| event.end >= from)
+        .collect()
+}
+
+/// `d_nfp`, `d_cpi`, `d_fomc` for the horizon `[from, to]`, in `EventKind::ALL` order.
+pub fn event_terms_between(events: &[MacroEvent], from: i64, to: i64) -> [f64; 3] {
+    let mut terms = [0.0; 3];
+    for event in events_between(events, from, to) {
+        let slot = EventKind::ALL
+            .iter()
+            .position(|kind| *kind == event.kind)
+            .expect("known kind");
+        terms[slot] = 1.0;
+    }
+    terms
+}
