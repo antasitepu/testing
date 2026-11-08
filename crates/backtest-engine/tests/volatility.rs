@@ -1,0 +1,298 @@
+use backtest_engine::edge::{ResearchWindow, ResearchWindows, SplitMix64};
+use backtest_engine::volatility::{
+    HORIZON_BARS, Lookbacks, MIN_SLOT_ORIGINS, Origin, collect_origins, evaluate, least_squares,
+    new_york_slot, relative_true_ranges, seasonal_profile,
+};
+use chrono::{TimeZone, Utc};
+use market_domain::{Candle, Symbol, Timeframe};
+use rust_decimal::Decimal;
+
+const HOUR: i64 = 3_600_000;
+
+fn utc(year: i32, month: u32, day: u32, hour: u32, minute: u32) -> i64 {
+    Utc.with_ymd_and_hms(year, month, day, hour, minute, 0)
+        .unwrap()
+        .timestamp_millis()
+}
+
+/// An hourly candle; prices in cents.
+fn hour_candle(open_time: i64, open: i64, high: i64, low: i64, close: i64) -> Candle {
+    Candle::new(
+        Symbol::new("XAUUSD").unwrap(),
+        Timeframe::H1,
+        open_time,
+        open_time + HOUR - 1,
+        Decimal::new(open, 2),
+        Decimal::new(high, 2),
+        Decimal::new(low, 2),
+        Decimal::new(close, 2),
+    )
+    .unwrap()
+}
+
+/// `count` hourly candles from 2021-01-04, open = close = 100.00, range 2.00.
+fn flat_hours(count: usize) -> Vec<Candle> {
+    let start = utc(2021, 1, 4, 0, 0);
+    (0..count as i64)
+        .map(|index| hour_candle(start + index * HOUR, 10_000, 10_100, 9_900, 10_000))
+        .collect()
+}
+
+fn constant_atr(count: usize) -> Vec<Option<Decimal>> {
+    (0..count)
+        .map(|index| (index >= 13).then(|| Decimal::new(200, 2)))
+        .collect()
+}
+
+fn windows_at(candles: &[Candle], validation: usize, test: usize) -> ResearchWindows {
+    ResearchWindows {
+        train_start: candles[0].open_time,
+        validation_start: candles[validation].open_time,
+        test_start: candles[test].open_time,
+        vault_start: candles[candles.len() - 1].open_time + HOUR,
+    }
+}
+
+#[test]
+fn lookbacks_count_bars_per_day_week_and_month() {
+    assert_eq!(
+        Lookbacks::of(Timeframe::M15),
+        Lookbacks {
+            day: 96,
+            week: 480,
+            month: 2112
+        }
+    );
+    assert_eq!(Lookbacks::of(Timeframe::H1).month, 528);
+}
+
+#[test]
+fn relative_true_range_includes_the_gap_from_the_previous_close() {
+    let start = utc(2021, 1, 4, 0, 0);
+    let candles = vec![
+        hour_candle(start, 10_000, 10_100, 9_900, 10_000),
+        // Gap up: high 104, low 103, previous close 100 -> TR 4.
+        hour_candle(start + HOUR, 10_350, 10_400, 10_300, 10_350),
+        // Inside bar: TR = high - low = 1 against close 103.5.
+        hour_candle(start + 2 * HOUR, 10_350, 10_400, 10_300, 10_350),
+    ];
+    let rtr = relative_true_ranges(&candles);
+    assert_eq!(rtr[0], None);
+    assert!((rtr[1].unwrap() - 0.04).abs() < 1e-12);
+    assert!((rtr[2].unwrap() - 1.0 / 103.5).abs() < 1e-12);
+}
+
+#[test]
+fn new_york_slot_follows_daylight_saving() {
+    // 08:30 in New York in winter (UTC-5) and in summer (UTC-4).
+    assert_eq!(new_york_slot(utc(2021, 3, 1, 13, 30), Timeframe::M15), 34);
+    assert_eq!(new_york_slot(utc(2021, 3, 15, 12, 30), Timeframe::M15), 34);
+    // 17:00 New York in July.
+    assert_eq!(new_york_slot(utc(2021, 7, 1, 21, 0), Timeframe::H1), 17);
+    assert_eq!(new_york_slot(utc(2021, 7, 1, 21, 30), Timeframe::M30), 35);
+}
+
+fn profile_origin(window: ResearchWindow, slot: usize, ratio: f64) -> Origin {
+    Origin {
+        index: 0,
+        window,
+        day: 0,
+        target: 0.0,
+        x_atr: 0.0,
+        ln_rd: 0.0,
+        ln_rw: 0.0,
+        ln_rm: 0.0,
+        slot,
+        profile_ratio: ratio,
+        ln_season: 0.0,
+    }
+}
+
+#[test]
+fn profile_uses_train_only_and_keeps_thin_slots_neutral() {
+    let mut origins = Vec::new();
+    origins.extend((0..MIN_SLOT_ORIGINS).map(|_| profile_origin(ResearchWindow::Train, 0, 2.0)));
+    origins.extend((0..MIN_SLOT_ORIGINS).map(|_| profile_origin(ResearchWindow::Train, 1, 1.0)));
+    origins.extend((0..5).map(|_| profile_origin(ResearchWindow::Train, 2, 10.0)));
+    // Validation never shapes the profile.
+    origins.extend((0..100).map(|_| profile_origin(ResearchWindow::Validation, 1, 50.0)));
+    let profile = seasonal_profile(&origins, 4);
+    let overall = (60.0 + 30.0 + 50.0) / 65.0;
+    assert!((profile[0] - 2.0 / overall).abs() < 1e-12);
+    assert!((profile[1] - 1.0 / overall).abs() < 1e-12);
+    assert_eq!(profile[2], 1.0);
+    assert_eq!(profile[3], 1.0);
+}
+
+#[test]
+fn origins_need_a_month_of_history_ready_bars_and_one_window() {
+    let count = 720;
+    let mut candles = flat_hours(count);
+    // A spike inside the first origin's horizon.
+    let spike = 540;
+    let open_time = candles[spike].open_time;
+    candles[spike] = hour_candle(open_time, 10_000, 10_500, 9_900, 10_000);
+    let mut ready = vec![true; count];
+    ready[600] = false;
+    let windows = windows_at(&candles, 650, 690);
+    let origins = collect_origins(
+        &candles,
+        &constant_atr(count),
+        &ready,
+        &windows,
+        Timeframe::H1,
+    )
+    .unwrap();
+    let indices: Vec<usize> = origins.origins.iter().map(|origin| origin.index).collect();
+
+    let first = Lookbacks::of(Timeframe::H1).month + 1;
+    assert_eq!(indices[0], first);
+    // Bar 600 not ready: no origin whose signal bar (601) or last target bar
+    // (577) is 600. In the harness a missing bar also makes the next 200 bars
+    // unready, which keeps every target span free of gaps.
+    assert!(!indices.contains(&577));
+    assert!(!indices.contains(&601));
+    assert!(
+        [576, 578, 600, 602]
+            .iter()
+            .all(|index| indices.contains(index))
+    );
+    // No target crosses into validation at bar 650.
+    assert!(indices.contains(&626));
+    assert!(!(627..=649).any(|index| indices.contains(&index)));
+    assert!(indices.contains(&650));
+    // The last origin's horizon ends at the last candle; test ends with the data.
+    assert_eq!(*indices.last().unwrap(), count - HORIZON_BARS);
+    assert_eq!(origins.skipped, [0, 0, 0]);
+
+    let at = |index: usize| {
+        origins
+            .origins
+            .iter()
+            .find(|origin| origin.index == index)
+            .unwrap()
+    };
+    // Range 99.00..105.00 over open 100.00, then the plain 2.00 range.
+    assert!((at(first).target - 0.06_f64.ln()).abs() < 1e-12);
+    assert!((at(spike + 1).target - 0.02_f64.ln()).abs() < 1e-12);
+    assert!((at(first).x_atr - 0.02_f64.ln()).abs() < 1e-12);
+    assert_eq!(at(first).window, ResearchWindow::Train);
+    assert_eq!(at(650).window, ResearchWindow::Validation);
+}
+
+#[test]
+fn flat_bars_are_skipped_and_counted() {
+    let count = 600;
+    let mut candles = flat_hours(count);
+    let start = 560;
+    for candle in candles.iter_mut().skip(start).take(HORIZON_BARS) {
+        *candle = hour_candle(candle.open_time, 10_000, 10_000, 10_000, 10_000);
+    }
+    let windows = windows_at(&candles, 590, 595);
+    let origins = collect_origins(
+        &candles,
+        &constant_atr(count),
+        &vec![true; count],
+        &windows,
+        Timeframe::H1,
+    )
+    .unwrap();
+    // Only the origin whose whole horizon is flat has a zero range.
+    assert_eq!(origins.skipped, [1, 0, 0]);
+    assert!(!origins.origins.iter().any(|origin| origin.index == start));
+}
+
+#[test]
+fn least_squares_recovers_exact_coefficients_and_rejects_singular_systems() {
+    let rows: Vec<Vec<f64>> = (0..20)
+        .map(|index| {
+            let x = f64::from(index);
+            vec![1.0, x, (x * 0.37).sin()]
+        })
+        .collect();
+    let targets: Vec<f64> = rows
+        .iter()
+        .map(|row| 2.0 + 3.0 * row[1] - 0.5 * row[2])
+        .collect();
+    let fit = least_squares(&rows, &targets).unwrap();
+    for (got, want) in fit.iter().zip([2.0, 3.0, -0.5]) {
+        assert!((got - want).abs() < 1e-9, "{got} vs {want}");
+    }
+    let singular: Vec<Vec<f64>> = rows
+        .iter()
+        .map(|row| vec![1.0, row[1], 2.0 * row[1]])
+        .collect();
+    assert_eq!(least_squares(&singular, &targets), None);
+    assert_eq!(least_squares(&rows[..2], &targets[..2]), None);
+}
+
+/// Hourly candles whose ranges follow a slow regime and an hour-of-day shape.
+fn synthetic_hours(days: usize) -> Vec<Candle> {
+    let mut random = SplitMix64::new(7);
+    let start = utc(2021, 1, 4, 0, 0);
+    let mut close = 180_000_i64;
+    (0..(days * 24) as i64)
+        .map(|index| {
+            let hour = index % 24;
+            let regime = 1.0 + 0.5 * ((index / 24) as f64 / 7.0).sin();
+            let shape = if (13..17).contains(&hour) { 2.0 } else { 1.0 };
+            let noise = 0.5 + (random.next_u64() % 1000) as f64 / 1000.0;
+            let half = (100.0 * regime * shape * noise) as i64 + 1;
+            let step = (random.next_u64() % 201) as i64 - 100;
+            let open = close;
+            close = open + step;
+            let high = open.max(close) + half;
+            let low = open.min(close) - half;
+            hour_candle(start + index * HOUR, open, high, low, close)
+        })
+        .collect()
+}
+
+#[test]
+fn evaluate_fits_on_train_and_scores_every_window() {
+    let candles = synthetic_hours(120);
+    let count = candles.len();
+    let windows = windows_at(&candles, 24 * 70, 24 * 95);
+    let atr = constant_atr(count)
+        .into_iter()
+        .enumerate()
+        .map(|(index, value)| value.map(|_| candles[index].high - candles[index].low))
+        .collect::<Vec<_>>();
+    let ready = vec![true; count];
+    let report = evaluate(&candles, &atr, &ready, &windows, Timeframe::H1).unwrap();
+
+    assert_eq!(report.profile.len(), 24);
+    assert_eq!(report.lines.len(), 9);
+    let origins = collect_origins(&candles, &atr, &ready, &windows, Timeframe::H1).unwrap();
+    for line in &report.lines {
+        assert_eq!(line.status, "OK", "{line:?}");
+        assert_eq!(line.horizon_bars, HORIZON_BARS);
+        let members: Vec<&Origin> = origins
+            .origins
+            .iter()
+            .filter(|origin| origin.window == line.window)
+            .collect();
+        assert_eq!(line.origins, members.len());
+        let expected_columns = match line.model {
+            "ATR14_CAL" => 2,
+            "HAR_RANGE" => 4,
+            _ => 5,
+        };
+        assert_eq!(line.coefficients.len(), expected_columns);
+        if line.role == "baseline" {
+            assert_eq!(line.daily_loss_diff, None);
+        } else {
+            let mut days: Vec<i64> = members.iter().map(|origin| origin.day).collect();
+            days.dedup();
+            assert_eq!(line.daily_loss_diff.as_ref().unwrap().len(), days.len());
+        }
+    }
+    // Every model's train error is finite and positive.
+    let train_mse: Vec<f64> = report
+        .lines
+        .iter()
+        .filter(|line| line.window == ResearchWindow::Train)
+        .map(|line| line.mse.unwrap())
+        .collect();
+    assert!(train_mse.iter().all(|mse| mse.is_finite() && *mse > 0.0));
+}

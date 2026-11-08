@@ -9,6 +9,7 @@ use backtest_engine::edge::{
     evaluate_case, precompute_outcomes, score_entries,
 };
 use backtest_engine::hypotheses::{Hypothesis, day_cycle_entries, tsmom_entries};
+use backtest_engine::volatility;
 use backtest_engine::{
     BacktestReplay, BacktestRunInput, CandlePriceReference, FeeConfig, ReplayFrame, SlippageConfig,
     SpreadConfig,
@@ -86,8 +87,50 @@ fn facts_for_window(window: &[Candle]) -> Vec<ConfirmedFact<Value>> {
     }
 }
 
-/// Scores one hypothesis with edge-v1. Readiness is the plans' gap rule plus 200
-/// bars of history; bars before the evaluated range are never ready.
+/// The plans' gap rule plus 200 bars of history; bars before the evaluated range
+/// (`start`) are never ready.
+fn research_readiness(history: &History, timeframe: Timeframe, start: usize) -> Vec<bool> {
+    history
+        .candles
+        .iter()
+        .enumerate()
+        .map(|(index, candle)| {
+            index >= start.max(200) && !has_recent_gap(history, timeframe, candle.close_time)
+        })
+        .collect()
+}
+
+/// Scores the range forecast benchmark (`vol-v1`) on one timeframe.
+fn print_volatility(
+    symbol: &str,
+    timeframe: Timeframe,
+    history: &History,
+    max_bars: usize,
+    windows: &ResearchWindows,
+) {
+    let candles = &history.candles;
+    let start = candles.len().saturating_sub(max_bars);
+    let ready_at_close = research_readiness(history, timeframe, start);
+    let atr = analysis_core::calculate_atr(candles, volatility::ATR_PERIOD)
+        .expect("vol ATR")
+        .values;
+    let report = volatility::evaluate(candles, &atr, &ready_at_close, windows, timeframe)
+        .expect("vol-v1 evaluation");
+    let identity = json!({ "symbol": symbol, "timeframe": timeframe.as_str() });
+    let mut profile = identity.clone();
+    profile["volVersion"] = json!(volatility::VOL_VERSION);
+    profile["profile"] = json!(report.profile);
+    println!("VOL_PROFILE,{profile}");
+    for line in report.lines {
+        let mut value = serde_json::to_value(&line).expect("vol line");
+        for (key, field) in identity.as_object().unwrap() {
+            value[key] = field.clone();
+        }
+        println!("VOL_CASE,{value}");
+    }
+}
+
+/// Scores one hypothesis with edge-v1, with the research readiness above.
 fn print_hypothesis_edge(
     hypothesis: Hypothesis,
     histories: &BTreeMap<Timeframe, History>,
@@ -98,13 +141,7 @@ fn print_hypothesis_edge(
     let history = &histories[&timeframe];
     let candles = &history.candles;
     let start = candles.len().saturating_sub(max_bars);
-    let ready_at_close: Vec<bool> = candles
-        .iter()
-        .enumerate()
-        .map(|(index, candle)| {
-            index >= start.max(200) && !has_recent_gap(history, timeframe, candle.close_time)
-        })
-        .collect();
+    let ready_at_close = research_readiness(history, timeframe, start);
     let atr = analysis_core::calculate_atr(candles, EDGE_V1.atr_period)
         .expect("edge ATR")
         .values;
@@ -355,6 +392,25 @@ async fn print_runtime_baseline_from_database() {
             "databaseWrites": false,
         })
     );
+
+    // The range forecast benchmark (vol-v1) replaces the plan replay.
+    if std::env::var("GOLD_BASELINE_VOLATILITY").as_deref() == Ok("1") {
+        let dates: ResearchWindowDates =
+            serde_json::from_str(research_windows_config(symbol.as_str()))
+                .expect("research windows config");
+        let windows = ResearchWindows::from_dates(&dates).expect("valid research windows");
+        for timeframe in &evaluated_timeframes {
+            print_volatility(
+                symbol.as_str(),
+                *timeframe,
+                &histories[timeframe],
+                max_bars,
+                &windows,
+            );
+        }
+        pool.close().await;
+        return;
+    }
 
     // Research-only hypotheses replace the plan replay; edge-v1 scores their entries.
     if let Ok(list) = std::env::var("GOLD_BASELINE_HYPOTHESES") {

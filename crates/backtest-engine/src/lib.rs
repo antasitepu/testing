@@ -5,6 +5,7 @@ mod execution;
 pub mod hypotheses;
 mod metrics;
 mod replay;
+pub mod volatility;
 
 pub use execution::{
     CandlePriceReference, ExecutionAdapter, ExecutionKind, ExecutionModel,
