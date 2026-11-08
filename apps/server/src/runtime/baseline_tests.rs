@@ -128,6 +128,30 @@ fn print_volatility(
         }
         println!("VOL_CASE,{value}");
     }
+    // vol-v3: scheduled-event terms from config/macro-events.json (public domain).
+    if std::env::var("GOLD_BASELINE_VOL_EVENTS").as_deref() == Ok("1") {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/macro-events.json");
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+        let file: volatility::MacroEventsFile =
+            serde_json::from_str(&text).expect("macro events JSON");
+        let events = file.events().expect("valid macro events");
+        let mut calendar = identity.clone();
+        calendar["calendarVersion"] = json!(file.version);
+        calendar["events"] = json!(events.len());
+        println!("VOL_EVENTS_CALENDAR,{calendar}");
+        for line in
+            volatility::evaluate_events(candles, &atr, &ready_at_close, windows, timeframe, &events)
+                .expect("vol-v3 evaluation")
+        {
+            let mut value = serde_json::to_value(&line).expect("vol-v3 line");
+            for (key, field) in identity.as_object().unwrap() {
+                value[key] = field.clone();
+            }
+            println!("VOL_EVENTS,{value}");
+        }
+    }
     // vol-v2: band quantiles and the refit candidate; no vault candle is a target.
     if std::env::var("GOLD_BASELINE_VOL_BAND").as_deref() == Ok("1") {
         let band = volatility::band_report(candles, &atr, &ready_at_close, windows, timeframe)
@@ -149,6 +173,89 @@ fn print_volatility(
         refit["model"] = json!("HAR_RANGE_SEASONAL");
         refit["fit"] = serde_json::to_value(&band.refit).expect("refit");
         println!("VOL_REFIT,{refit}");
+    }
+}
+
+/// True on GitHub Actions or any CI runner: the vault never enters CI.
+fn running_in_ci(env: impl Fn(&str) -> Option<String>) -> bool {
+    ["CI", "GITHUB_ACTIONS"]
+        .iter()
+        .any(|key| env(key).is_some_and(|value| !value.is_empty() && value != "false"))
+}
+
+/// A frozen range model from the private `research/models`, read at run time so
+/// public builds need no private file.
+fn load_range_model(variable: &str, file: &str) -> volatility::RangeModel {
+    let path = std::env::var(variable)
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../research/models")
+                .join(file)
+        });
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+    serde_json::from_str(&text).expect("range model JSON")
+}
+
+/// The vol-v2 vault check (Parts 1-3): residuals of the live model and of the
+/// refit candidate, exactly as frozen, on every eligible vault origin.
+fn print_vault_check(
+    symbol: &str,
+    history: &History,
+    cutoff: i64,
+    max_bars: usize,
+    vault_start: i64,
+) {
+    let timeframe = Timeframe::M15;
+    let candles = &history.candles;
+    // Counted before anything is scored; a count-only run stops here.
+    let trading_days = volatility::vault_trading_days(candles, vault_start, cutoff);
+    if std::env::var("GOLD_VAULT_COUNT_ONLY").as_deref() == Ok("1") {
+        println!(
+            "VOL_VAULT_DAYS,{}",
+            json!({ "symbol": symbol, "vaultStart": vault_start, "cutoff": cutoff, "tradingDays": trading_days })
+        );
+        return;
+    }
+    let start = candles.len().saturating_sub(max_bars);
+    let ready_at_close = research_readiness(history, timeframe, start);
+    let atr = analysis_core::calculate_atr(candles, volatility::ATR_PERIOD)
+        .expect("vault ATR")
+        .values;
+    let origins = volatility::collect_origins(
+        candles,
+        &atr,
+        &ready_at_close,
+        &volatility::vault_windows(vault_start),
+        timeframe,
+    )
+    .expect("vault origins")
+    .origins;
+    for (name, variable, file) in [
+        (
+            "live",
+            "GOLD_VAULT_LIVE_MODEL",
+            "range-forecast-xauusdt-15m-vol-v1.json",
+        ),
+        (
+            "refit",
+            "GOLD_VAULT_REFIT_MODEL",
+            "range-forecast-xauusdt-15m-vol-v1-refit-candidate.json",
+        ),
+    ] {
+        let model = load_range_model(variable, file);
+        assert_eq!(model.validated_timeframe(), Ok(timeframe), "{file}");
+        let scores = volatility::vault_scores(candles, &origins, &model, timeframe);
+        let mut value = serde_json::to_value(&scores).expect("vault scores");
+        value["symbol"] = json!(symbol);
+        value["timeframe"] = json!(timeframe.as_str());
+        value["model"] = json!(name);
+        value["modelFile"] = json!(file);
+        value["vaultStart"] = json!(vault_start);
+        value["cutoff"] = json!(cutoff);
+        value["tradingDays"] = json!(trading_days);
+        println!("VOL_VAULT,{value}");
     }
 }
 
@@ -414,6 +521,35 @@ async fn print_runtime_baseline_from_database() {
             "databaseWrites": false,
         })
     );
+
+    // The vol-v2 vault check: once, on the laptop, never in CI.
+    if std::env::var("GOLD_BASELINE_VOL_VAULT").as_deref() == Ok("1") {
+        assert!(
+            !running_in_ci(|key| std::env::var(key).ok()),
+            "the vault check runs on the laptop only, never in CI"
+        );
+        assert_eq!(
+            symbol.as_str(),
+            "XAUUSDT",
+            "the vault check is for the live XAUUSDT model"
+        );
+        assert!(
+            evaluated_timeframes == [Timeframe::M15],
+            "the live range model is 15m"
+        );
+        let dates: ResearchWindowDates =
+            serde_json::from_str(research_windows_config("XAUUSDT")).expect("XAUUSDT windows");
+        let windows = ResearchWindows::from_dates(&dates).expect("valid research windows");
+        print_vault_check(
+            symbol.as_str(),
+            &histories[&Timeframe::M15],
+            cutoff,
+            max_bars,
+            windows.vault_start,
+        );
+        pool.close().await;
+        return;
+    }
 
     // The range forecast benchmark (vol-v1) replaces the plan replay.
     if std::env::var("GOLD_BASELINE_VOLATILITY").as_deref() == Ok("1") {
@@ -756,6 +892,25 @@ fn spot_gold_windows_end_where_xauusdt_history_begins() {
         windows.test_start, 1_640_995_200_000,
         "test starts 2022-01-01"
     );
+}
+
+#[test]
+fn the_vault_check_refuses_ci_runners() {
+    let env = |pairs: &'static [(&'static str, &'static str)]| {
+        move |key: &str| {
+            pairs
+                .iter()
+                .find(|(name, _)| *name == key)
+                .map(|(_, value)| (*value).to_owned())
+        }
+    };
+    assert!(running_in_ci(env(&[("GITHUB_ACTIONS", "true")])));
+    assert!(running_in_ci(env(&[("CI", "1")])));
+    assert!(!running_in_ci(env(&[])));
+    assert!(!running_in_ci(env(&[
+        ("CI", "false"),
+        ("GITHUB_ACTIONS", "")
+    ])));
 }
 
 #[test]

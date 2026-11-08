@@ -642,3 +642,299 @@ pub fn band_report(
         refit_band,
     }))
 }
+
+// --- Vault check, laptop only (Parts 1-3 of the vol-v2 spec).
+
+/// Windows that put every origin from `vault_start` on into one window, so
+/// `collect_origins` applies the vol-v1 eligibility to the vault unchanged.
+/// Targets cannot pass the loaded history, which ends at the check's cutoff.
+pub fn vault_windows(vault_start: i64) -> ResearchWindows {
+    ResearchWindows {
+        train_start: vault_start,
+        validation_start: i64::MAX - 2,
+        test_start: i64::MAX - 1,
+        vault_start: i64::MAX,
+    }
+}
+
+/// UTC dates with at least one session-clean candle opening in the vault and
+/// closing by `cutoff`: the trading-day count of the 60-day rule.
+pub fn vault_trading_days(candles: &[Candle], vault_start: i64, cutoff: i64) -> usize {
+    candles
+        .iter()
+        .filter(|candle| candle.open_time >= vault_start && candle.close_time <= cutoff)
+        .map(|candle| candle.open_time.div_euclid(DAY_MS))
+        .collect::<BTreeSet<_>>()
+        .len()
+}
+
+/// Log residuals of a frozen model and of its ATR14 baseline on vault origins.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultScores {
+    pub origins: usize,
+    pub open_times: Vec<i64>,
+    pub residuals: Vec<f64>,
+    pub baseline_residuals: Vec<f64>,
+}
+
+/// Scores `model` exactly as frozen: its own profile and coefficients, no refit.
+pub fn vault_scores(
+    candles: &[Candle],
+    origins: &[Origin],
+    model: &RangeModel,
+    timeframe: Timeframe,
+) -> VaultScores {
+    let mut scores = VaultScores {
+        origins: 0,
+        open_times: Vec::new(),
+        residuals: Vec::new(),
+        baseline_residuals: Vec::new(),
+    };
+    for origin in origins {
+        let Some(ln_season) =
+            seasonal_feature(&model.profile, &horizon_opens(candles, origin), timeframe)
+        else {
+            continue;
+        };
+        let linear = |weights: &[f64], values: &[f64]| -> f64 {
+            weights.iter().zip(values).map(|(w, v)| w * v).sum()
+        };
+        let forecast = linear(
+            &model.coefficients,
+            &[1.0, origin.ln_rd, origin.ln_rw, origin.ln_rm, ln_season],
+        );
+        let baseline = linear(&model.baseline_coefficients, &[1.0, origin.x_atr]);
+        scores.origins += 1;
+        scores.open_times.push(candles[origin.index].open_time);
+        scores.residuals.push(origin.target - forecast);
+        scores.baseline_residuals.push(origin.target - baseline);
+    }
+    scores
+}
+
+// --- vol-v3: scheduled-event terms. See
+// `docs/superpowers/specs/2026-11-08-event-aware-range-forecast-design.md`.
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EventKind {
+    Nfp,
+    Cpi,
+    Fomc,
+}
+
+impl EventKind {
+    pub const ALL: [Self; 3] = [Self::Nfp, Self::Cpi, Self::Fomc];
+
+    fn parse(name: &str) -> Option<Self> {
+        match name {
+            "NFP" => Some(Self::Nfp),
+            "CPI" => Some(Self::Cpi),
+            "FOMC" => Some(Self::Fomc),
+            _ => None,
+        }
+    }
+}
+
+/// One scheduled event; a point when `start == end`, else an interval (FOMC).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MacroEvent {
+    pub kind: EventKind,
+    pub start: i64,
+    pub end: i64,
+}
+
+/// `config/macro-events.json` as written by `scripts/research/build_macro_events.py`.
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct MacroEventsFile {
+    pub version: String,
+    pub events: Vec<MacroEventRow>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct MacroEventRow {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub start: String,
+    pub end: String,
+}
+
+impl MacroEventsFile {
+    /// Events in milliseconds, sorted by start; any unknown type or bad time is an error.
+    pub fn events(&self) -> Result<Vec<MacroEvent>, String> {
+        let millis = |text: &str| {
+            DateTime::parse_from_rfc3339(text)
+                .map(|time| time.timestamp_millis())
+                .map_err(|error| format!("bad event time {text}: {error}"))
+        };
+        let mut events = self
+            .events
+            .iter()
+            .map(|row| {
+                let kind = EventKind::parse(&row.kind)
+                    .ok_or_else(|| format!("unknown event type {}", row.kind))?;
+                let (start, end) = (millis(&row.start)?, millis(&row.end)?);
+                if end < start {
+                    return Err(format!("event ends before it starts: {}", row.start));
+                }
+                Ok(MacroEvent { kind, start, end })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        events.sort_by_key(|event| (event.start, event.end));
+        Ok(events)
+    }
+}
+
+/// `d_nfp`, `d_cpi`, `d_fomc` of one origin: 1 when an event of that kind touches
+/// the horizon from the open of bar `index` to the close of bar `index + H - 1`.
+pub fn event_terms(candles: &[Candle], origin: &Origin, events: &[MacroEvent]) -> [f64; 3] {
+    let from = candles[origin.index].open_time;
+    let to = candles[origin.index + HORIZON_BARS - 1].close_time;
+    let longest = events
+        .iter()
+        .map(|event| event.end - event.start)
+        .max()
+        .unwrap_or(0);
+    let first = events.partition_point(|event| event.start < from - longest);
+    let last = events.partition_point(|event| event.start <= to);
+    let mut terms = [0.0; 3];
+    for event in &events[first..last] {
+        if event.end >= from {
+            let slot = EventKind::ALL
+                .iter()
+                .position(|kind| *kind == event.kind)
+                .expect("known kind");
+            terms[slot] = 1.0;
+        }
+    }
+    terms
+}
+
+/// Per window: the vol-v3 candidate against `HAR_RANGE_SEASONAL`, split into
+/// event horizons (`E`) and the rest (`N`).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventLine {
+    pub vol_version: &'static str,
+    pub model: &'static str,
+    pub baseline: &'static str,
+    pub window: ResearchWindow,
+    /// `OK`, `NO_FIT` or `EMPTY`.
+    pub status: &'static str,
+    pub origins_event: usize,
+    pub origins_other: usize,
+    /// Horizons touched per kind, in `EventKind::ALL` order.
+    pub horizons_by_kind: [usize; 3],
+    pub mse_baseline_event: Option<f64>,
+    pub mse_candidate_event: Option<f64>,
+    pub mse_baseline_other: Option<f64>,
+    pub mse_candidate_other: Option<f64>,
+    /// Baseline minus candidate squared error on `E`, mean per UTC day, day order.
+    pub daily_loss_diff_event: Vec<f64>,
+    /// Candidate fit on train: HAR_RANGE_SEASONAL terms, then d_nfp, d_cpi, d_fomc.
+    pub coefficients: Vec<f64>,
+    pub baseline_coefficients: Vec<f64>,
+}
+
+/// Fits the baseline and the candidate on train exactly like vol-v1 and scores
+/// every window out of sample.
+pub fn evaluate_events(
+    candles: &[Candle],
+    atr: &[Option<Decimal>],
+    ready_at_close: &[bool],
+    windows: &ResearchWindows,
+    timeframe: Timeframe,
+    events: &[MacroEvent],
+) -> Result<Vec<EventLine>, VolError> {
+    let mut origins = collect_origins(candles, atr, ready_at_close, windows, timeframe)?;
+    let profile = seasonal_profile(&origins.origins, Lookbacks::of(timeframe).day);
+    apply_profile(candles, &mut origins, &profile, timeframe);
+    let origins = origins.origins;
+    let terms: Vec<[f64; 3]> = origins
+        .iter()
+        .map(|origin| event_terms(candles, origin, events))
+        .collect();
+    let base_row = |origin: &Origin| {
+        vec![
+            1.0,
+            origin.ln_rd,
+            origin.ln_rw,
+            origin.ln_rm,
+            origin.ln_season,
+        ]
+    };
+    let candidate_row = |position: usize| {
+        let mut row = base_row(&origins[position]);
+        row.extend_from_slice(&terms[position]);
+        row
+    };
+    let train: Vec<usize> = (0..origins.len())
+        .filter(|position| origins[*position].window == ResearchWindow::Train)
+        .collect();
+    let targets: Vec<f64> = train.iter().map(|p| origins[*p].target).collect();
+    let baseline = least_squares(
+        &train
+            .iter()
+            .map(|p| base_row(&origins[*p]))
+            .collect::<Vec<_>>(),
+        &targets,
+    );
+    let candidate = least_squares(
+        &train.iter().map(|p| candidate_row(*p)).collect::<Vec<_>>(),
+        &targets,
+    );
+    let dot = |weights: &[f64], values: &[f64]| -> f64 {
+        weights.iter().zip(values).map(|(w, v)| w * v).sum()
+    };
+
+    let mut lines = Vec::new();
+    for window in ResearchWindow::ALL {
+        let members: Vec<usize> = (0..origins.len())
+            .filter(|position| origins[*position].window == window)
+            .collect();
+        let is_event = |position: &usize| terms[*position].iter().any(|term| *term > 0.0);
+        let event: Vec<usize> = members.iter().copied().filter(is_event).collect();
+        let other: Vec<usize> = members.iter().copied().filter(|p| !is_event(p)).collect();
+        let mut horizons_by_kind = [0_usize; 3];
+        for position in &members {
+            for (slot, term) in terms[*position].iter().enumerate() {
+                horizons_by_kind[slot] += usize::from(*term > 0.0);
+            }
+        }
+        let mut line = EventLine {
+            vol_version: "vol-v3",
+            model: "HAR_RANGE_SEASONAL_EVENTS",
+            baseline: VolModel::HarRangeSeasonal.name(),
+            window,
+            status: "NO_FIT",
+            origins_event: event.len(),
+            origins_other: other.len(),
+            horizons_by_kind,
+            mse_baseline_event: None,
+            mse_candidate_event: None,
+            mse_baseline_other: None,
+            mse_candidate_other: None,
+            daily_loss_diff_event: Vec::new(),
+            coefficients: candidate.clone().unwrap_or_default(),
+            baseline_coefficients: baseline.clone().unwrap_or_default(),
+        };
+        if let (Some(base), Some(cand)) = (&baseline, &candidate) {
+            let base_error = |p: usize| origins[p].target - dot(base, &base_row(&origins[p]));
+            let cand_error = |p: usize| origins[p].target - dot(cand, &candidate_row(p));
+            let mse = |set: &[usize], error: &dyn Fn(usize) -> f64| -> Option<f64> {
+                (!set.is_empty())
+                    .then(|| set.iter().map(|p| error(*p).powi(2)).sum::<f64>() / set.len() as f64)
+            };
+            line.status = if members.is_empty() { "EMPTY" } else { "OK" };
+            line.mse_baseline_event = mse(&event, &base_error);
+            line.mse_candidate_event = mse(&event, &cand_error);
+            line.mse_baseline_other = mse(&other, &base_error);
+            line.mse_candidate_other = mse(&other, &cand_error);
+            line.daily_loss_diff_event = daily_means(&origins, &event, |p| {
+                base_error(p).powi(2) - cand_error(p).powi(2)
+            });
+        }
+        lines.push(line);
+    }
+    Ok(lines)
+}

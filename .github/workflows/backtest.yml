@@ -92,6 +92,12 @@ jobs:
                   echo "$plan runs alone on timeframes=$registered with edge=true"; exit 1
                 fi
                 ;;
+              # The event-aware range forecast (vol-v3) runs alone on 15m, without edge.
+              VOL_EVENTS)
+                if (( ${#plans[@]} != 1 )) || [[ "$TIMEFRAMES" != 15m || "$EDGE" == true ]]; then
+                  echo "$plan runs alone on timeframes=15m with edge=false"; exit 1
+                fi
+                ;;
               # The range forecast benchmark (vol-v1) runs alone on 15m, 30m and 1h, without edge.
               VOL_FORECAST)
                 if (( ${#plans[@]} != 1 )) || [[ ! "$TIMEFRAMES" =~ ^((15m|30m|1h),)*(15m|30m|1h)$ || "$EDGE" == true ]]; then
@@ -192,6 +198,9 @@ jobs:
           if [[ "$PLAN" =~ ^(GOLD_DAY_CYCLE|TSMOM_12M)$ ]]; then
             # A research hypothesis replaces the plan replay; edge-v1 scores its entries.
             export GOLD_BASELINE_HYPOTHESES="$PLAN"
+            unset GOLD_BASELINE_PLANS
+          elif [[ "$PLAN" == VOL_EVENTS ]]; then
+            export GOLD_BASELINE_VOLATILITY=1 GOLD_BASELINE_VOL_EVENTS=1
             unset GOLD_BASELINE_PLANS
           elif [[ "$PLAN" == VOL_FORECAST ]]; then
             export GOLD_BASELINE_VOLATILITY=1

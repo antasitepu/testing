@@ -1,8 +1,10 @@
 use backtest_engine::edge::{ResearchWindow, ResearchWindows, SplitMix64};
 use backtest_engine::volatility::{
-    HORIZON_BARS, Lookbacks, MIN_SLOT_ORIGINS, Origin, RangeModel, apply_profile, band_report,
-    collect_origins, evaluate, har_features, least_squares, new_york_slot, quantile,
-    relative_true_ranges, seasonal_feature, seasonal_profile,
+    EventKind, HORIZON_BARS, Lookbacks, MIN_SLOT_ORIGINS, MacroEvent, MacroEventsFile, Origin,
+    RangeModel, apply_profile, band_report, collect_origins, evaluate, evaluate_events,
+    event_terms, fit_seasonal, har_features, least_squares, new_york_slot, quantile,
+    relative_true_ranges, seasonal_feature, seasonal_profile, vault_scores, vault_trading_days,
+    vault_windows,
 };
 use chrono::{TimeZone, Utc};
 use market_domain::{Candle, Symbol, Timeframe};
@@ -491,4 +493,255 @@ fn band_report_reuses_the_train_fit_and_scores_each_banded_origin_once() {
         );
     }
     assert_ne!(report.refit.coefficients, report.live_fit.coefficients);
+}
+
+#[test]
+fn vault_scoring_uses_only_vault_origins_and_the_frozen_model_as_is() {
+    let candles = synthetic_quarters(120);
+    let count = candles.len();
+    let atr: Vec<Option<Decimal>> = (0..count)
+        .map(|index| (index >= 13).then(|| candles[index].high - candles[index].low))
+        .collect();
+    let ready = vec![true; count];
+    let vault_start = candles[96 * 100].open_time;
+
+    // A frozen model fitted on everything before the vault.
+    let research = ResearchWindows {
+        train_start: candles[0].open_time,
+        validation_start: vault_start - 2,
+        test_start: vault_start - 1,
+        vault_start,
+    };
+    let before = collect_origins(&candles, &atr, &ready, &research, Timeframe::M15)
+        .unwrap()
+        .origins;
+    let members: Vec<usize> = (0..before.len()).collect();
+    let fit = fit_seasonal(&candles, &before, &members, Timeframe::M15).unwrap();
+    let model = RangeModel {
+        vol_version: "vol-v1".to_owned(),
+        model: "HAR_RANGE_SEASONAL".to_owned(),
+        symbol: "XAUUSDT".to_owned(),
+        timeframe: "15m".to_owned(),
+        horizon_bars: HORIZON_BARS,
+        coefficients: fit.coefficients.clone(),
+        baseline_coefficients: fit.baseline_coefficients.clone(),
+        profile: fit.profile.clone(),
+    };
+
+    let vault = collect_origins(
+        &candles,
+        &atr,
+        &ready,
+        &vault_windows(vault_start),
+        Timeframe::M15,
+    )
+    .unwrap()
+    .origins;
+    assert!(!vault.is_empty());
+    assert!(
+        vault
+            .iter()
+            .all(|origin| candles[origin.index].open_time >= vault_start)
+    );
+    // The last origin's target ends at the last loaded candle.
+    assert_eq!(vault.last().unwrap().index, count - HORIZON_BARS);
+
+    let scores = vault_scores(&candles, &vault, &model, Timeframe::M15);
+    assert_eq!(scores.origins, vault.len());
+    let origin = &vault[vault.len() / 2];
+    let opens: Vec<i64> = candles[origin.index..origin.index + HORIZON_BARS]
+        .iter()
+        .map(|candle| candle.open_time)
+        .collect();
+    let ln_season = seasonal_feature(&model.profile, &opens, Timeframe::M15).unwrap();
+    let c = &model.coefficients;
+    let forecast =
+        c[0] + c[1] * origin.ln_rd + c[2] * origin.ln_rw + c[3] * origin.ln_rm + c[4] * ln_season;
+    let b = &model.baseline_coefficients;
+    let position = vault.len() / 2;
+    assert!((scores.residuals[position] - (origin.target - forecast)).abs() < 1e-12);
+    assert!(
+        (scores.baseline_residuals[position] - (origin.target - (b[0] + b[1] * origin.x_atr)))
+            .abs()
+            < 1e-12
+    );
+    assert_eq!(scores.open_times[position], candles[origin.index].open_time);
+}
+
+#[test]
+fn vault_trading_days_count_dates_inside_the_vault_and_cutoff() {
+    let candles = synthetic_quarters(10);
+    let vault_start = candles[96 * 4].open_time;
+    let cutoff = candles[96 * 7 - 1].close_time;
+    assert_eq!(vault_trading_days(&candles, vault_start, cutoff), 3);
+    assert_eq!(vault_trading_days(&candles, vault_start, vault_start), 0);
+}
+
+fn calendar(rows: &[(&str, &str, &str)]) -> MacroEventsFile {
+    let events: Vec<serde_json::Value> = rows
+        .iter()
+        .map(|(kind, start, end)| serde_json::json!({ "type": kind, "start": start, "end": end }))
+        .collect();
+    serde_json::from_value(serde_json::json!({ "version": "test", "events": events })).unwrap()
+}
+
+#[test]
+fn macro_events_parse_with_offsets_sort_and_reject_bad_rows() {
+    let file = calendar(&[
+        (
+            "FOMC",
+            "2026-01-28T12:30:00-05:00",
+            "2026-01-28T14:15:00-05:00",
+        ),
+        (
+            "NFP",
+            "2026-01-09T08:30:00-05:00",
+            "2026-01-09T08:30:00-05:00",
+        ),
+        (
+            "CPI",
+            "2026-07-14T08:30:00-04:00",
+            "2026-07-14T08:30:00-04:00",
+        ),
+    ]);
+    let events = file.events().unwrap();
+    assert_eq!(
+        events.iter().map(|event| event.kind).collect::<Vec<_>>(),
+        vec![EventKind::Nfp, EventKind::Fomc, EventKind::Cpi]
+    );
+    assert_eq!(events[0].start, utc(2026, 1, 9, 13, 30));
+    assert_eq!(events[2].start, utc(2026, 7, 14, 12, 30));
+    assert_eq!(events[1].end - events[1].start, 105 * 60_000);
+
+    assert!(
+        calendar(&[(
+            "GDP",
+            "2026-01-09T08:30:00-05:00",
+            "2026-01-09T08:30:00-05:00"
+        )])
+        .events()
+        .is_err()
+    );
+    assert!(
+        calendar(&[(
+            "FOMC",
+            "2026-01-28T14:15:00-05:00",
+            "2026-01-28T12:30:00-05:00"
+        )])
+        .events()
+        .is_err()
+    );
+}
+
+#[test]
+fn event_terms_cover_the_whole_horizon_and_no_more() {
+    let candles = flat_hours(600);
+    let origin = |index: usize| Origin {
+        index,
+        window: ResearchWindow::Train,
+        day: 0,
+        target: 0.0,
+        x_atr: 0.0,
+        ln_rd: 0.0,
+        ln_rw: 0.0,
+        ln_rm: 0.0,
+        slot: 0,
+        profile_ratio: 0.0,
+        ln_season: 0.0,
+    };
+    let from = candles[550].open_time;
+    let to = candles[550 + HORIZON_BARS - 1].close_time;
+    let point = |kind, time| MacroEvent {
+        kind,
+        start: time,
+        end: time,
+    };
+    let at = |events: &[MacroEvent]| event_terms(&candles, &origin(550), events);
+    assert_eq!(at(&[point(EventKind::Nfp, from)]), [1.0, 0.0, 0.0]);
+    assert_eq!(at(&[point(EventKind::Cpi, to)]), [0.0, 1.0, 0.0]);
+    assert_eq!(at(&[point(EventKind::Nfp, to + 1)]), [0.0, 0.0, 0.0]);
+    assert_eq!(at(&[point(EventKind::Nfp, from - 1)]), [0.0, 0.0, 0.0]);
+    // An FOMC interval that started before the horizon still touches it.
+    let fomc = MacroEvent {
+        kind: EventKind::Fomc,
+        start: from - HOUR,
+        end: from + 1,
+    };
+    assert_eq!(at(&[fomc]), [0.0, 0.0, 1.0]);
+    let earlier = MacroEvent {
+        kind: EventKind::Fomc,
+        start: from - 2 * HOUR,
+        end: from - 1,
+    };
+    assert_eq!(
+        at(&[earlier, point(EventKind::Nfp, from + HOUR)]),
+        [1.0, 0.0, 0.0]
+    );
+}
+
+#[test]
+fn evaluate_events_keeps_the_vol_v1_baseline_and_splits_event_horizons() {
+    let candles = synthetic_quarters(120);
+    let count = candles.len();
+    let windows = ResearchWindows {
+        train_start: candles[0].open_time,
+        validation_start: candles[96 * 70].open_time,
+        test_start: candles[96 * 95].open_time,
+        vault_start: candles[count - 1].open_time + HOUR,
+    };
+    let atr: Vec<Option<Decimal>> = (0..count)
+        .map(|index| (index >= 13).then(|| candles[index].high - candles[index].low))
+        .collect();
+    let ready = vec![true; count];
+    // Weekly "NFP" and "CPI" at 13:30 UTC on different days, an FOMC interval every
+    // four weeks: every kind occurs in train, so the candidate can be fitted.
+    let mut events = Vec::new();
+    for (kind, offset) in [(EventKind::Nfp, 3), (EventKind::Cpi, 5)] {
+        for day in (offset..120).step_by(7) {
+            let time = candles[96 * day].open_time + 13 * HOUR + 30 * 60_000;
+            events.push(MacroEvent {
+                kind,
+                start: time,
+                end: time,
+            });
+        }
+    }
+    for day in (10..120).step_by(28) {
+        let start = candles[96 * day].open_time + 17 * HOUR;
+        events.push(MacroEvent {
+            kind: EventKind::Fomc,
+            start,
+            end: start + 105 * 60_000,
+        });
+    }
+    events.sort_by_key(|event| event.start);
+
+    let lines = evaluate_events(&candles, &atr, &ready, &windows, Timeframe::M15, &events).unwrap();
+    let vol_v1 = evaluate(&candles, &atr, &ready, &windows, Timeframe::M15).unwrap();
+    let seasonal_train = vol_v1
+        .lines
+        .iter()
+        .find(|line| line.model == "HAR_RANGE_SEASONAL" && line.window == ResearchWindow::Train)
+        .unwrap();
+    assert_eq!(lines.len(), 3);
+    for line in &lines {
+        assert_eq!(line.status, "OK", "{line:?}");
+        assert_eq!(line.baseline_coefficients, seasonal_train.coefficients);
+        assert_eq!(line.coefficients.len(), 8);
+        let same_window = vol_v1
+            .lines
+            .iter()
+            .find(|other| other.window == line.window && other.model == "HAR_RANGE_SEASONAL")
+            .unwrap();
+        assert_eq!(line.origins_event + line.origins_other, same_window.origins);
+        assert!(line.origins_event > 0);
+        // Every kind occurs in train; later windows need not hold all of them.
+        if line.window == ResearchWindow::Train {
+            assert!(
+                line.horizons_by_kind.iter().all(|count| *count > 0),
+                "{line:?}"
+            );
+        }
+        assert!(!line.daily_loss_diff_event.is_empty());
+    }
 }
