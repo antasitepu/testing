@@ -263,6 +263,8 @@ version = "0.1.0"
 dependencies = [
  "analysis-domain",
  "analysis-plans",
+ "chrono",
+ "chrono-tz",
  "execution-domain",
  "market-domain",
  "rust_decimal",

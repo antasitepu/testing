@@ -2,6 +2,7 @@
 
 pub mod edge;
 mod execution;
+pub mod hypotheses;
 mod metrics;
 mod replay;
 

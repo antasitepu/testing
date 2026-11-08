@@ -56,6 +56,7 @@ jobs:
           CUTOFF_MS: ${{ inputs.cutoff_ms }}
           RAW_WINDOW: ${{ inputs.raw_window }}
           SYMBOL: ${{ inputs.symbol }}
+          EDGE: ${{ inputs.edge }}
           RESULTS_AGE_RECIPIENT: ${{ vars.RESULTS_AGE_RECIPIENT }}
         run: |
           # Results are only ever uploaded encrypted; refuse to run without a recipient.
@@ -84,6 +85,13 @@ jobs:
           for plan in "${plans[@]}"; do
             case "$plan" in
               ICT | SMC | RSI | QUASIMODO | TREND_BREAKOUT | MEAN_REVERSION | SESSION_BREAKOUT | VOLATILITY_SQUEEZE) ;;
+              # Research hypotheses run alone, on their one registered timeframe, with edge.
+              GOLD_DAY_CYCLE | TSMOM_12M)
+                registered="15m"; [[ "$plan" == TSMOM_12M ]] && registered="1h"
+                if (( ${#plans[@]} != 1 )) || [[ "$TIMEFRAMES" != "$registered" || "$EDGE" != true ]]; then
+                  echo "$plan runs alone on timeframes=$registered with edge=true"; exit 1
+                fi
+                ;;
               *) echo "unknown plan: $plan"; exit 1 ;;
             esac
           done
@@ -175,6 +183,11 @@ jobs:
           GOLD_EDGE_BENCHMARK: ${{ inputs.edge && '1' || '0' }}
         run: |
           # The log holds results, so it stays off the public job log.
+          if [[ "$PLAN" =~ ^(GOLD_DAY_CYCLE|TSMOM_12M)$ ]]; then
+            # A research hypothesis replaces the plan replay; edge-v1 scores its entries.
+            export GOLD_BASELINE_HYPOTHESES="$PLAN"
+            unset GOLD_BASELINE_PLANS
+          fi
           status=0
           cargo test --release --locked -p gold-monitoring-server --lib \
             print_runtime_baseline_from_database -- --ignored --nocapture >"baseline-$TIMEFRAME-$PLAN.log" 2>&1 || status=$?

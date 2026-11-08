@@ -1,13 +1,14 @@
 //! Read-only historical baseline, separate from parameter tuning and promotion.
 use super::*;
 use analysis_domain::{
-    CanonicalMarketSnapshot, MaterializedProfile, ReadinessReason, TimeframeFacts,
+    CanonicalMarketSnapshot, Direction, MaterializedProfile, ReadinessReason, TimeframeFacts,
 };
 use analysis_plans::{PlanError, PlanEvaluation, PlanEvaluator, PlanRuntimeState};
 use backtest_engine::edge::{
-    EDGE_V1, RealEntry, ResearchWindowDates, ResearchWindows, eligible_bars, evaluate_case,
-    precompute_outcomes,
+    EDGE_V1, RealEntry, ResearchWindow, ResearchWindowDates, ResearchWindows, eligible_bars,
+    evaluate_case, precompute_outcomes, score_entries,
 };
+use backtest_engine::hypotheses::{Hypothesis, day_cycle_entries, tsmom_entries};
 use backtest_engine::{
     BacktestReplay, BacktestRunInput, CandlePriceReference, FeeConfig, ReplayFrame, SlippageConfig,
     SpreadConfig,
@@ -82,6 +83,85 @@ fn facts_for_window(window: &[Candle]) -> Vec<ConfirmedFact<Value>> {
         Vec::new()
     } else {
         build_facts(window).expect("runtime fact construction")
+    }
+}
+
+/// Scores one hypothesis with edge-v1. Readiness is the plans' gap rule plus 200
+/// bars of history; bars before the evaluated range are never ready.
+fn print_hypothesis_edge(
+    hypothesis: Hypothesis,
+    histories: &BTreeMap<Timeframe, History>,
+    max_bars: usize,
+    windows: &ResearchWindows,
+) {
+    let timeframe = hypothesis.timeframe();
+    let history = &histories[&timeframe];
+    let candles = &history.candles;
+    let start = candles.len().saturating_sub(max_bars);
+    let ready_at_close: Vec<bool> = candles
+        .iter()
+        .enumerate()
+        .map(|(index, candle)| {
+            index >= start.max(200) && !has_recent_gap(history, timeframe, candle.close_time)
+        })
+        .collect();
+    let atr = analysis_core::calculate_atr(candles, EDGE_V1.atr_period)
+        .expect("edge ATR")
+        .values;
+    let outcomes = precompute_outcomes(candles, &atr, &EDGE_V1).expect("edge outcomes");
+    let eligible =
+        eligible_bars(candles, &outcomes, &ready_at_close, windows).expect("edge eligibility");
+    let entries = match hypothesis {
+        Hypothesis::GoldDayCycle => day_cycle_entries(&candles[start..]),
+        Hypothesis::Tsmom12m => tsmom_entries(
+            &candles[start..],
+            &histories[&Timeframe::D1].candles,
+            EDGE_V1.time_stop_bars,
+        ),
+    };
+    let case_key = format!(
+        "{}/{}/{}/{}",
+        timeframe.as_str(),
+        hypothesis.name(),
+        hypothesis.algorithm_version(),
+        hypothesis.parameter_version()
+    );
+    let identity = json!({
+        "timeframe": timeframe.as_str(),
+        "plan": hypothesis.name(),
+        "algorithmVersion": hypothesis.algorithm_version(),
+        "parameterVersion": hypothesis.parameter_version(),
+        "runtimeAlgorithm": "research-hypothesis",
+    });
+    for line in evaluate_case(
+        candles, &outcomes, &eligible, &entries, windows, &case_key, &EDGE_V1,
+    ) {
+        let mut value = serde_json::to_value(&line).expect("edge line");
+        for (key, field) in identity.as_object().unwrap() {
+            value[key] = field.clone();
+        }
+        println!("EDGE_CASE,{value}");
+    }
+    // Diagnostic only, never deciding; the sealed test window is not described.
+    for (window, scored) in score_entries(candles, &eligible, &entries, windows) {
+        if window == ResearchWindow::Test {
+            continue;
+        }
+        let side = |direction: Direction| {
+            let rs: Vec<f64> = scored
+                .scored
+                .iter()
+                .filter(|(_, side)| *side == direction)
+                .filter_map(|(index, side)| outcomes.get(*index, *side).map(|outcome| outcome.r))
+                .collect();
+            let mean = (!rs.is_empty()).then(|| rs.iter().sum::<f64>() / rs.len() as f64);
+            json!({ "entries": rs.len(), "meanR": mean })
+        };
+        let mut value = identity.clone();
+        value["window"] = json!(window);
+        value["buy"] = side(Direction::Buy);
+        value["sell"] = side(Direction::Sell);
+        println!("HYPOTHESIS_SIDES,{value}");
     }
 }
 
@@ -275,6 +355,25 @@ async fn print_runtime_baseline_from_database() {
             "databaseWrites": false,
         })
     );
+
+    // Research-only hypotheses replace the plan replay; edge-v1 scores their entries.
+    if let Ok(list) = std::env::var("GOLD_BASELINE_HYPOTHESES") {
+        let windows = edge_windows
+            .as_ref()
+            .expect("hypotheses are scored only by the edge benchmark");
+        for name in list.split(',') {
+            let hypothesis =
+                Hypothesis::from_name(name).unwrap_or_else(|| panic!("unknown hypothesis {name}"));
+            assert!(
+                evaluated_timeframes == [hypothesis.timeframe()],
+                "{name} is registered for {} only",
+                hypothesis.timeframe().as_str()
+            );
+            print_hypothesis_edge(hypothesis, &histories, max_bars, windows);
+        }
+        pool.close().await;
+        return;
+    }
 
     // Every history stays loaded, because a timeframe reads its higher timeframe's candles.
     for timeframe in evaluated_timeframes {
@@ -571,8 +670,14 @@ fn spot_gold_windows_end_where_xauusdt_history_begins() {
     let windows = ResearchWindows::from_dates(&dates).unwrap();
     // Spot history stops at the XAUUSDT listing; the XAUUSDT windows stay untouched.
     assert_eq!(windows.vault_start, 1_765_411_200_000);
-    assert_eq!(windows.train_start, 1_262_304_000_000, "train starts 2010-01-01");
-    assert_eq!(windows.test_start, 1_640_995_200_000, "test starts 2022-01-01");
+    assert_eq!(
+        windows.train_start, 1_262_304_000_000,
+        "train starts 2010-01-01"
+    );
+    assert_eq!(
+        windows.test_start, 1_640_995_200_000,
+        "test starts 2022-01-01"
+    );
 }
 
 #[test]
