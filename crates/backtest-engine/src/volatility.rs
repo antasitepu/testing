@@ -1,25 +1,27 @@
 //! Range forecast benchmark (`vol-v1`): does a HAR forecast of the next 24 bars'
 //! range, with or without an intraday-periodicity term, beat the app's ATR14?
-//! Research only; nothing here reaches a plan or the live system. See
+//! Research only; the formulas the app reuses live in
+//! `analysis_core::range_forecast`. See
 //! `docs/superpowers/specs/2026-11-08-gold-range-forecast-benchmark-design.md`.
 
 use crate::edge::{ResearchWindow, ResearchWindows};
-use chrono::{DateTime, Timelike};
-use chrono_tz::America::New_York;
+use chrono::{DateTime, Datelike};
 use market_domain::{Candle, Timeframe};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use serde::Serialize;
+use std::collections::BTreeSet;
 
-pub const VOL_VERSION: &str = "vol-v1";
-/// Forecast horizon in bars, the `edge-v1` time stop.
-pub const HORIZON_BARS: usize = 24;
+/// Shared with the app's display-only forecast; one definition for both.
+pub use analysis_core::range_forecast::{
+    HORIZON_BARS, Lookbacks, RangeForecast, RangeModel, VOL_VERSION, har_features, new_york_slot,
+    relative_true_ranges, seasonal_feature,
+};
+
 /// Wilder ATR period of the baseline, the ATR the app uses.
 pub const ATR_PERIOD: usize = 14;
 /// A slot seen in fewer train origins than this keeps a neutral profile of 1.
 pub const MIN_SLOT_ORIGINS: usize = 30;
-const WEEK_DAYS: usize = 5;
-const MONTH_DAYS: usize = 22;
 const DAY_MS: i64 = 86_400_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
@@ -67,53 +69,6 @@ impl VolModel {
             ],
         }
     }
-}
-
-/// Bars per day, week and month. HAR means count bars, not calendar time, so
-/// closed days are skipped as everywhere else in the harness.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Lookbacks {
-    pub day: usize,
-    pub week: usize,
-    pub month: usize,
-}
-
-impl Lookbacks {
-    pub fn of(timeframe: Timeframe) -> Self {
-        let day = usize::try_from(DAY_MS / timeframe.duration_ms()).expect("positive duration");
-        Self {
-            day,
-            week: WEEK_DAYS * day,
-            month: MONTH_DAYS * day,
-        }
-    }
-}
-
-/// `TR_j / close_{j-1}`; `None` for the first candle or a non-positive close.
-pub fn relative_true_ranges(candles: &[Candle]) -> Vec<Option<f64>> {
-    candles
-        .iter()
-        .enumerate()
-        .map(|(index, candle)| {
-            let close = candles[index.checked_sub(1)?].close;
-            if close <= Decimal::ZERO {
-                return None;
-            }
-            let range = (candle.high - candle.low)
-                .max((candle.high - close).abs())
-                .max((candle.low - close).abs());
-            (range / close).to_f64()
-        })
-        .collect()
-}
-
-/// Minutes since local midnight in New York, divided by the timeframe.
-pub fn new_york_slot(time: i64, timeframe: Timeframe) -> usize {
-    let local = DateTime::from_timestamp_millis(time)
-        .expect("valid candle time")
-        .with_timezone(&New_York);
-    let minutes = i64::from(local.hour() * 60 + local.minute());
-    usize::try_from(minutes * 60_000 / timeframe.duration_ms()).expect("non-negative slot")
 }
 
 /// One forecast, made after bar `index - 1` closes, for bars `index..index + H`.
@@ -237,12 +192,19 @@ pub fn collect_origins(
 /// `P(s)`: mean `profile_ratio` of train origins in slot `s` over the same mean
 /// of all train origins. A slot with fewer than `MIN_SLOT_ORIGINS` keeps 1.
 pub fn seasonal_profile(origins: &[Origin], slot_count: usize) -> Vec<f64> {
+    profile_of(
+        origins
+            .iter()
+            .filter(|origin| origin.window == ResearchWindow::Train),
+        slot_count,
+    )
+}
+
+/// `P(s)` over the given origins, the same rule as `seasonal_profile`.
+fn profile_of<'a>(origins: impl IntoIterator<Item = &'a Origin>, slot_count: usize) -> Vec<f64> {
     let mut sums = vec![0.0; slot_count];
     let mut counts = vec![0_usize; slot_count];
-    for origin in origins
-        .iter()
-        .filter(|origin| origin.window == ResearchWindow::Train)
-    {
+    for origin in origins {
         sums[origin.slot] += origin.profile_ratio;
         counts[origin.slot] += 1;
     }
@@ -273,12 +235,11 @@ pub fn apply_profile(
 ) {
     let mut kept = Vec::with_capacity(origins.origins.len());
     for mut origin in origins.origins.drain(..) {
-        let mean = candles[origin.index..origin.index + HORIZON_BARS]
+        let opens: Vec<i64> = candles[origin.index..origin.index + HORIZON_BARS]
             .iter()
-            .map(|candle| profile[new_york_slot(candle.open_time, timeframe)])
-            .sum::<f64>()
-            / HORIZON_BARS as f64;
-        match positive_ln(mean) {
+            .map(|candle| candle.open_time)
+            .collect();
+        match seasonal_feature(profile, &opens, timeframe) {
             Some(ln_season) => {
                 origin.ln_season = ln_season;
                 kept.push(origin);
@@ -476,4 +437,208 @@ fn daily_means(origins: &[Origin], members: &[usize], value: impl Fn(usize) -> f
         means.push(sum / count as f64);
     }
     means
+}
+
+// --- vol-v2: band, refit and leave-one-month-out. See
+// `docs/superpowers/specs/2026-11-08-range-forecast-vault-check-and-band-design.md`.
+
+/// Percentile by linear interpolation between order statistics (R type 7,
+/// numpy's default). `None` for an empty slice or a probability outside 0..=1.
+pub fn quantile(values: &[f64], probability: f64) -> Option<f64> {
+    if values.is_empty() || !(0.0..=1.0).contains(&probability) {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let position = (sorted.len() - 1) as f64 * probability;
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    Some(sorted[lower] + (position - lower as f64) * (sorted[upper] - sorted[lower]))
+}
+
+/// A `HAR_RANGE_SEASONAL` fit with its own profile, and the `ATR14_CAL` fit of
+/// the same origins.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeasonalFit {
+    pub coefficients: Vec<f64>,
+    pub baseline_coefficients: Vec<f64>,
+    pub profile: Vec<f64>,
+    pub origins: usize,
+}
+
+fn horizon_opens(candles: &[Candle], origin: &Origin) -> Vec<i64> {
+    candles[origin.index..origin.index + HORIZON_BARS]
+        .iter()
+        .map(|candle| candle.open_time)
+        .collect()
+}
+
+/// Fits the profile and both models on `members` only, the way `evaluate` fits
+/// them on train. Members whose profile mean is not positive are left out.
+pub fn fit_seasonal(
+    candles: &[Candle],
+    origins: &[Origin],
+    members: &[usize],
+    timeframe: Timeframe,
+) -> Option<SeasonalFit> {
+    let profile = profile_of(
+        members.iter().map(|member| &origins[*member]),
+        Lookbacks::of(timeframe).day,
+    );
+    let (mut rows, mut baseline_rows, mut targets) = (Vec::new(), Vec::new(), Vec::new());
+    for member in members {
+        let origin = &origins[*member];
+        let Some(ln_season) =
+            seasonal_feature(&profile, &horizon_opens(candles, origin), timeframe)
+        else {
+            continue;
+        };
+        rows.push(vec![
+            1.0,
+            origin.ln_rd,
+            origin.ln_rw,
+            origin.ln_rm,
+            ln_season,
+        ]);
+        baseline_rows.push(vec![1.0, origin.x_atr]);
+        targets.push(origin.target);
+    }
+    Some(SeasonalFit {
+        coefficients: least_squares(&rows, &targets)?,
+        baseline_coefficients: least_squares(&baseline_rows, &targets)?,
+        profile,
+        origins: rows.len(),
+    })
+}
+
+impl SeasonalFit {
+    /// Log residual `y - yhat` of one origin under this fit.
+    pub fn residual(
+        &self,
+        candles: &[Candle],
+        origin: &Origin,
+        timeframe: Timeframe,
+    ) -> Option<f64> {
+        let ln_season =
+            seasonal_feature(&self.profile, &horizon_opens(candles, origin), timeframe)?;
+        let forecast: f64 = [1.0, origin.ln_rd, origin.ln_rw, origin.ln_rm, ln_season]
+            .iter()
+            .zip(&self.coefficients)
+            .map(|(value, weight)| value * weight)
+            .sum();
+        Some(origin.target - forecast)
+    }
+}
+
+/// The central 80% band of log residuals.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Band {
+    pub fit: &'static str,
+    pub q10: f64,
+    pub q90: f64,
+    pub origins: usize,
+}
+
+impl Band {
+    fn of(fit: &'static str, residuals: &[f64]) -> Option<Self> {
+        Some(Self {
+            fit,
+            q10: quantile(residuals, 0.10)?,
+            q90: quantile(residuals, 0.90)?,
+            origins: residuals.len(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct BandReport {
+    /// The live model's fit on train; it must equal the frozen model file.
+    pub live_fit: SeasonalFit,
+    /// Its residuals on every origin from `validation_start` to the vault.
+    pub live_band: Band,
+    /// The refit on every origin before the vault.
+    pub refit: SeasonalFit,
+    /// Leave-one-month-out residuals of the refit over the same months.
+    pub refit_band: Band,
+}
+
+/// UTC calendar month as `year * 12 + month0`.
+fn utc_month(time: i64) -> i64 {
+    let date = DateTime::from_timestamp_millis(time).expect("valid candle time");
+    i64::from(date.year()) * 12 + i64::from(date.month0())
+}
+
+/// Band quantiles of the live model, the refit and its leave-one-month-out band.
+/// Only origins inside the research windows exist, so no vault candle is a target.
+pub fn band_report(
+    candles: &[Candle],
+    atr: &[Option<Decimal>],
+    ready_at_close: &[bool],
+    windows: &ResearchWindows,
+    timeframe: Timeframe,
+) -> Result<Option<BandReport>, VolError> {
+    let origins = collect_origins(candles, atr, ready_at_close, windows, timeframe)?.origins;
+    let open = |member: usize| candles[origins[member].index].open_time;
+    let all: Vec<usize> = (0..origins.len()).collect();
+    let train: Vec<usize> = all
+        .iter()
+        .copied()
+        .filter(|member| origins[*member].window == ResearchWindow::Train)
+        .collect();
+    let banded: Vec<usize> = all
+        .iter()
+        .copied()
+        .filter(|member| open(*member) >= windows.validation_start)
+        .collect();
+    let residuals = |fit: &SeasonalFit, members: &[usize]| -> Vec<f64> {
+        members
+            .iter()
+            .filter_map(|member| fit.residual(candles, &origins[*member], timeframe))
+            .collect()
+    };
+
+    let Some(live_fit) = fit_seasonal(candles, &origins, &train, timeframe) else {
+        return Ok(None);
+    };
+    let Some(live_band) = Band::of("train", &residuals(&live_fit, &banded)) else {
+        return Ok(None);
+    };
+    let Some(refit) = fit_seasonal(candles, &origins, &all, timeframe) else {
+        return Ok(None);
+    };
+
+    // Each month of the band is predicted by a refit that saw no target bar in it.
+    let months: BTreeSet<i64> = banded
+        .iter()
+        .map(|member| utc_month(open(*member)))
+        .collect();
+    let mut left_out = Vec::new();
+    for month in months {
+        let touches = |member: &usize| {
+            let origin = &origins[*member];
+            utc_month(candles[origin.index].open_time) == month
+                || utc_month(candles[origin.index + HORIZON_BARS - 1].open_time) == month
+        };
+        let fit_members: Vec<usize> = all.iter().copied().filter(|m| !touches(m)).collect();
+        let Some(fit) = fit_seasonal(candles, &origins, &fit_members, timeframe) else {
+            return Ok(None);
+        };
+        let scored: Vec<usize> = banded
+            .iter()
+            .copied()
+            .filter(|member| utc_month(open(*member)) == month)
+            .collect();
+        left_out.extend(residuals(&fit, &scored));
+    }
+    let Some(refit_band) = Band::of("refit-leave-one-month-out", &left_out) else {
+        return Ok(None);
+    };
+    Ok(Some(BandReport {
+        live_fit,
+        live_band,
+        refit,
+        refit_band,
+    }))
 }

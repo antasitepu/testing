@@ -36,6 +36,35 @@ fn production_defaults_are_loopback_and_use_binance_futures() {
         config.session_history.policy_version,
         "commodity-session-policy-v2"
     );
+    assert_eq!(
+        config.range_forecast_model,
+        Some(std::path::PathBuf::from(
+            "models/range-forecast-xauusdt-15m-vol-v1.json"
+        ))
+    );
+}
+
+#[test]
+fn range_forecast_model_path_can_be_replaced_or_switched_off() {
+    let mut custom = values();
+    custom.insert(
+        "RANGE_FORECAST_MODEL_PATH".to_owned(),
+        " research/models/m.json ".to_owned(),
+    );
+    assert_eq!(
+        AppConfig::from_values(&custom)
+            .unwrap()
+            .range_forecast_model,
+        Some(std::path::PathBuf::from("research/models/m.json"))
+    );
+    for disabled in ["off", ""] {
+        let mut off = values();
+        off.insert("RANGE_FORECAST_MODEL_PATH".to_owned(), disabled.to_owned());
+        assert_eq!(
+            AppConfig::from_values(&off).unwrap().range_forecast_model,
+            None
+        );
+    }
 }
 
 #[test]

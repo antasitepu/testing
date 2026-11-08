@@ -128,6 +128,28 @@ fn print_volatility(
         }
         println!("VOL_CASE,{value}");
     }
+    // vol-v2: band quantiles and the refit candidate; no vault candle is a target.
+    if std::env::var("GOLD_BASELINE_VOL_BAND").as_deref() == Ok("1") {
+        let band = volatility::band_report(candles, &atr, &ready_at_close, windows, timeframe)
+            .expect("vol-v2 band")
+            .expect("vol-v2 band fits");
+        for (fit, quantiles) in [
+            (&band.live_fit, &band.live_band),
+            (&band.refit, &band.refit_band),
+        ] {
+            let mut value = identity.clone();
+            value["volVersion"] = json!("vol-v2");
+            value["model"] = json!("HAR_RANGE_SEASONAL");
+            value["band"] = serde_json::to_value(quantiles).expect("band");
+            value["coefficients"] = json!(fit.coefficients);
+            println!("VOL_BAND,{value}");
+        }
+        let mut refit = identity.clone();
+        refit["volVersion"] = json!("vol-v2");
+        refit["model"] = json!("HAR_RANGE_SEASONAL");
+        refit["fit"] = serde_json::to_value(&band.refit).expect("refit");
+        println!("VOL_REFIT,{refit}");
+    }
 }
 
 /// Scores one hypothesis with edge-v1, with the research readiness above.

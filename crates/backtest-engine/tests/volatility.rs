@@ -1,7 +1,8 @@
 use backtest_engine::edge::{ResearchWindow, ResearchWindows, SplitMix64};
 use backtest_engine::volatility::{
-    HORIZON_BARS, Lookbacks, MIN_SLOT_ORIGINS, Origin, collect_origins, evaluate, least_squares,
-    new_york_slot, relative_true_ranges, seasonal_profile,
+    HORIZON_BARS, Lookbacks, MIN_SLOT_ORIGINS, Origin, RangeModel, apply_profile, band_report,
+    collect_origins, evaluate, har_features, least_squares, new_york_slot, quantile,
+    relative_true_ranges, seasonal_feature, seasonal_profile,
 };
 use chrono::{TimeZone, Utc};
 use market_domain::{Candle, Symbol, Timeframe};
@@ -295,4 +296,199 @@ fn evaluate_fits_on_train_and_scores_every_window() {
         .map(|line| line.mse.unwrap())
         .collect();
     assert!(train_mse.iter().all(|mse| mse.is_finite() && *mse > 0.0));
+}
+
+fn display_model(profile: Vec<f64>) -> RangeModel {
+    RangeModel {
+        vol_version: "vol-v1".to_owned(),
+        model: "HAR_RANGE_SEASONAL".to_owned(),
+        symbol: "XAUUSDT".to_owned(),
+        timeframe: "1h".to_owned(),
+        horizon_bars: HORIZON_BARS,
+        coefficients: vec![1.1, 0.5, 0.3, 0.1, 1.0],
+        baseline_coefficients: vec![-1.6, 0.5],
+        profile,
+    }
+}
+
+#[test]
+fn live_features_match_the_research_origins_exactly() {
+    let candles = synthetic_hours(120);
+    let count = candles.len();
+    let windows = windows_at(&candles, 24 * 70, 24 * 95);
+    let atr: Vec<Option<Decimal>> = (0..count)
+        .map(|index| (index >= 13).then(|| candles[index].high - candles[index].low))
+        .collect();
+    let mut origins =
+        collect_origins(&candles, &atr, &vec![true; count], &windows, Timeframe::H1).unwrap();
+    let profile = seasonal_profile(&origins.origins, 24);
+    apply_profile(&candles, &mut origins, &profile, Timeframe::H1);
+    let model = display_model(profile.clone());
+    assert_eq!(model.validated_timeframe(), Ok(Timeframe::H1));
+
+    for origin in origins.origins.iter().step_by(97) {
+        let history = &candles[..origin.index];
+        let [ln_rd, ln_rw, ln_rm] = har_features(history, Timeframe::H1).unwrap();
+        assert!((ln_rd - origin.ln_rd).abs() < 1e-9);
+        assert!((ln_rw - origin.ln_rw).abs() < 1e-9);
+        assert!((ln_rm - origin.ln_rm).abs() < 1e-9);
+        let opens: Vec<i64> = candles[origin.index..origin.index + HORIZON_BARS]
+            .iter()
+            .map(|candle| candle.open_time)
+            .collect();
+        let ln_season = seasonal_feature(&profile, &opens, Timeframe::H1).unwrap();
+        assert!((ln_season - origin.ln_season).abs() < 1e-12);
+
+        let forecast = model
+            .forecast(
+                history,
+                atr[origin.index - 1].unwrap(),
+                &opens,
+                Timeframe::H1,
+            )
+            .unwrap();
+        let close = history
+            .last()
+            .unwrap()
+            .close
+            .to_string()
+            .parse::<f64>()
+            .unwrap();
+        let expected =
+            (1.1 + 0.5 * origin.ln_rd + 0.3 * origin.ln_rw + 0.1 * origin.ln_rm + origin.ln_season)
+                .exp()
+                * close;
+        assert!((forecast.range - expected).abs() < 1e-6 * expected);
+        let expected_atr = (-1.6 + 0.5 * origin.x_atr).exp() * close;
+        assert!((forecast.atr_range - expected_atr).abs() < 1e-6 * expected_atr);
+    }
+}
+
+#[test]
+fn display_model_rejects_malformed_fits_and_short_inputs() {
+    let mut model = display_model(vec![1.0; 24]);
+    model.coefficients.pop();
+    assert!(model.validated_timeframe().is_err());
+    let mut model = display_model(vec![1.0; 23]);
+    assert!(model.validated_timeframe().is_err());
+    model.profile.push(f64::NAN);
+    assert!(model.validated_timeframe().is_err());
+
+    let model = display_model(vec![1.0; 24]);
+    let candles = synthetic_hours(30);
+    let opens: Vec<i64> = (1..=HORIZON_BARS as i64)
+        .map(|step| candles.last().unwrap().open_time + step * HOUR)
+        .collect();
+    let atr = Decimal::new(100, 2);
+    // A month of history is required, and exactly one horizon of opens.
+    assert!(har_features(&candles[..528], Timeframe::H1).is_none());
+    assert!(
+        model
+            .forecast(&candles[..528], atr, &opens, Timeframe::H1)
+            .is_none()
+    );
+    assert!(
+        model
+            .forecast(&candles, atr, &opens[1..], Timeframe::H1)
+            .is_none()
+    );
+    assert!(
+        model
+            .forecast(&candles, atr, &opens, Timeframe::H1)
+            .is_some()
+    );
+}
+
+#[test]
+fn quantile_interpolates_between_order_statistics_like_r_type_7() {
+    let values = [4.0, 1.0, 3.0, 2.0];
+    assert!((quantile(&values, 0.10).unwrap() - 1.3).abs() < 1e-12);
+    assert!((quantile(&values, 0.90).unwrap() - 3.7).abs() < 1e-12);
+    assert_eq!(quantile(&values, 0.0), Some(1.0));
+    assert_eq!(quantile(&values, 1.0), Some(4.0));
+    assert_eq!(quantile(&[], 0.5), None);
+    assert_eq!(quantile(&values, 1.5), None);
+}
+
+/// 15m candles whose ranges follow a slow regime and an hour-of-day shape. A
+/// 24-bar horizon spans six hours here, so the seasonal term varies by origin
+/// (on hourly bars without closures every horizon covers each hour once).
+fn synthetic_quarters(days: usize) -> Vec<Candle> {
+    let mut random = SplitMix64::new(11);
+    let start = utc(2021, 1, 4, 0, 0);
+    let quarter = HOUR / 4;
+    let mut close = 180_000_i64;
+    (0..(days * 96) as i64)
+        .map(|index| {
+            let hour = (index / 4) % 24;
+            let regime = 1.0 + 0.5 * ((index / 96) as f64 / 7.0).sin();
+            let shape = if (13..17).contains(&hour) { 2.0 } else { 1.0 };
+            let noise = 0.5 + (random.next_u64() % 1000) as f64 / 1000.0;
+            let half = (60.0 * regime * shape * noise) as i64 + 1;
+            let step = (random.next_u64() % 101) as i64 - 50;
+            let open = close;
+            close = open + step;
+            Candle::new(
+                Symbol::new("XAUUSD").unwrap(),
+                Timeframe::M15,
+                start + index * quarter,
+                start + (index + 1) * quarter - 1,
+                Decimal::new(open, 2),
+                Decimal::new(open.max(close) + half, 2),
+                Decimal::new(open.min(close) - half, 2),
+                Decimal::new(close, 2),
+            )
+            .unwrap()
+        })
+        .collect()
+}
+
+#[test]
+fn band_report_reuses_the_train_fit_and_scores_each_banded_origin_once() {
+    // Enough days that every fit sees at least 30 origins per 15m slot.
+    let candles = synthetic_quarters(120);
+    let count = candles.len();
+    let windows = ResearchWindows {
+        train_start: candles[0].open_time,
+        validation_start: candles[96 * 70].open_time,
+        test_start: candles[96 * 95].open_time,
+        vault_start: candles[count - 1].open_time + HOUR,
+    };
+    let atr: Vec<Option<Decimal>> = (0..count)
+        .map(|index| (index >= 13).then(|| candles[index].high - candles[index].low))
+        .collect();
+    let ready = vec![true; count];
+    let report = band_report(&candles, &atr, &ready, &windows, Timeframe::M15)
+        .unwrap()
+        .unwrap();
+
+    // The live fit is exactly the vol-v1 HAR_RANGE_SEASONAL fit on train.
+    let evaluated = evaluate(&candles, &atr, &ready, &windows, Timeframe::M15).unwrap();
+    let train_fit = evaluated
+        .lines
+        .iter()
+        .find(|line| line.model == "HAR_RANGE_SEASONAL" && line.window == ResearchWindow::Train)
+        .unwrap();
+    assert_eq!(report.live_fit.coefficients, train_fit.coefficients);
+    assert_eq!(report.live_fit.profile, evaluated.profile);
+
+    let origins = collect_origins(&candles, &atr, &ready, &windows, Timeframe::M15)
+        .unwrap()
+        .origins;
+    let banded = origins
+        .iter()
+        .filter(|origin| candles[origin.index].open_time >= windows.validation_start)
+        .count();
+    assert_eq!(report.live_band.origins, banded);
+    assert_eq!(report.refit_band.origins, banded);
+    assert_eq!(report.refit.origins, origins.len());
+    assert_eq!(report.live_band.fit, "train");
+    assert_eq!(report.refit_band.fit, "refit-leave-one-month-out");
+    for band in [&report.live_band, &report.refit_band] {
+        assert!(
+            band.q10 < 0.0 && band.q90 > 0.0 && band.q10 < band.q90,
+            "{band:?}"
+        );
+    }
+    assert_ne!(report.refit.coefficients, report.live_fit.coefficients);
 }

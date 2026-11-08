@@ -1,4 +1,5 @@
 use crate::execution_wake::ExecutionWakeSource;
+use crate::range_forecast::RangeForecaster;
 use crate::runtime::health::RuntimeHealthReader;
 use analysis_service::{BacktestStore, ConfigurationStore, RejectedCandidateStore, SignalStore};
 use execution_service::{MonitoringStore, ScalpingAuditStore, VirtualTradeStore};
@@ -20,6 +21,8 @@ pub struct AppState {
     pub virtual_trades: Option<Arc<dyn VirtualTradeStore>>,
     pub scalping_audits: Option<Arc<dyn ScalpingAuditStore>>,
     pub runtime_health: RuntimeHealthReader,
+    /// Display-only range forecast; `None` when no model file is configured.
+    pub range_forecast: Option<Arc<RangeForecaster>>,
     pub default_history_limit: u16,
 }
 
@@ -45,6 +48,7 @@ impl AppState {
             virtual_trades: None,
             scalping_audits: None,
             runtime_health: RuntimeHealthReader::starting(0),
+            range_forecast: None,
             default_history_limit,
         }
     }
@@ -94,6 +98,11 @@ impl AppState {
 
     pub fn with_runtime_health(mut self, runtime_health: RuntimeHealthReader) -> Self {
         self.runtime_health = runtime_health;
+        self
+    }
+
+    pub fn with_range_forecast(mut self, range_forecast: Arc<RangeForecaster>) -> Self {
+        self.range_forecast = Some(range_forecast);
         self
     }
 }

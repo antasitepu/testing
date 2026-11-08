@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+analysis-core = { path = "../analysis-core" }
 analysis-domain = { path = "../analysis-domain" }
 analysis-plans = { path = "../analysis-plans" }
 chrono.workspace = true

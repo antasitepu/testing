@@ -6,6 +6,7 @@ mod engine;
 mod indicators;
 mod liquidity;
 mod range;
+pub mod range_forecast;
 mod session_range;
 mod structure;
 

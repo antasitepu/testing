@@ -7,6 +7,8 @@ rust-version.workspace = true
 
 [dependencies]
 analysis-domain = { path = "../analysis-domain" }
+chrono.workspace = true
+chrono-tz.workspace = true
 market-domain = { path = "../market-domain" }
 rust_decimal.workspace = true
 serde.workspace = true

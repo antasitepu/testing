@@ -15,6 +15,8 @@ const DEFAULT_ANALYSIS_LEASE_SECONDS: u16 = 30;
 const DEFAULT_ANALYSIS_BARRIER_GRACE_SECONDS: u16 = 10;
 const DEFAULT_BACKTEST_MAX_CONCURRENT_RUNS: u16 = 1;
 const DEFAULT_SESSION_OVERRIDES_PATH: &str = "config/commodity-session-overrides.json";
+/// Shipped in every release by `deploy/release.sh` from the private `research/models`.
+const DEFAULT_RANGE_FORECAST_MODEL_PATH: &str = "models/range-forecast-xauusdt-15m-vol-v1.json";
 const DEFAULT_SESSION_POLICY_VERSION: &str = "commodity-session-policy-v2";
 
 #[derive(Debug, thiserror::Error)]
@@ -43,6 +45,9 @@ pub struct AppConfig {
     pub analysis_barrier_grace_seconds: u16,
     pub backtest_max_concurrent_runs: u16,
     pub session_history: SessionHistoryConfig,
+    /// Frozen display-only range forecast model: `RANGE_FORECAST_MODEL_PATH`, the
+    /// release default when unset, `None` when set to `off` or empty.
+    pub range_forecast_model: Option<PathBuf>,
 }
 
 impl AppConfig {
@@ -130,6 +135,14 @@ impl AppConfig {
                     DEFAULT_SESSION_POLICY_VERSION,
                 )
                 .to_owned(),
+            },
+            range_forecast_model: match values
+                .get("RANGE_FORECAST_MODEL_PATH")
+                .map(|value| value.trim())
+            {
+                None => Some(PathBuf::from(DEFAULT_RANGE_FORECAST_MODEL_PATH)),
+                Some("" | "off") => None,
+                Some(path) => Some(PathBuf::from(path)),
             },
         })
     }

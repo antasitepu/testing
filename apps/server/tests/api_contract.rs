@@ -549,6 +549,21 @@ async fn rsi_market_metrics_return_all_timeframes() {
 }
 
 #[tokio::test]
+async fn range_forecast_without_a_model_says_so_instead_of_failing() {
+    let (state, _, _) = state(16);
+    let app = api::router(state);
+
+    let (status, body) =
+        json_response(app, "/api/v1/market-metrics/range-forecast?symbol=XAUUSDT").await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["symbol"], "XAUUSDT");
+    assert_eq!(body["horizonBars"], 24);
+    assert_eq!(body["range"], Value::Null);
+    assert_eq!(body["reason"], "range forecast model is not configured");
+}
+
+#[tokio::test]
 async fn support_resistance_endpoint_uses_wide_default_lookback_and_validates_query() {
     let rows = (0..120)
         .map(|index| candle(i64::from(index) * 60_000))

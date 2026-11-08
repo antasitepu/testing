@@ -195,6 +195,8 @@ jobs:
             unset GOLD_BASELINE_PLANS
           elif [[ "$PLAN" == VOL_FORECAST ]]; then
             export GOLD_BASELINE_VOLATILITY=1
+            # vol-v2 band and refit belong to the live XAUUSDT model.
+            if [[ "$GOLD_BASELINE_SYMBOL" == XAUUSDT ]]; then export GOLD_BASELINE_VOL_BAND=1; fi
             unset GOLD_BASELINE_PLANS
           fi
           status=0

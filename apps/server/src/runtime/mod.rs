@@ -315,6 +315,20 @@ where
     .with_virtual_trades(virtual_trades)
     .with_scalping_audits(scalping_audits)
     .with_runtime_health(runtime_health.subscribe());
+    // Display only; a missing or invalid model leaves the card empty, never the app down.
+    let state = match &config.range_forecast_model {
+        Some(path) => match crate::range_forecast::RangeForecaster::from_file(
+            path,
+            Arc::new(SessionRepository::new(pool.clone())),
+        ) {
+            Ok(forecaster) => state.with_range_forecast(Arc::new(forecaster)),
+            Err(error) => {
+                tracing::warn!(%error, "range forecast model not loaded");
+                state
+            }
+        },
+        None => state,
+    };
     let app = build_router(state, &config.static_dir, config.public_host.as_deref());
     let listener = TcpListener::bind(config.bind).await?;
     tracing::info!(address = %listener.local_addr()?, "gold monitoring server listening");

@@ -10,6 +10,7 @@ pub mod execution_wake;
 pub mod health_api;
 pub mod loopback_guard;
 pub mod monitoring_api;
+pub mod range_forecast;
 pub mod runtime;
 pub mod runtime_analysis_candles;
 pub mod runtime_api;

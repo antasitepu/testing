@@ -3,6 +3,7 @@ use crate::{
         ApiErrorDto, CandleDto, CandlePageDto, MarketDto, ResyncDto, SnapshotDto, StatusDto,
         SyncStatusDto,
     },
+    range_forecast::RangeForecastDto,
     runtime::build_facts,
     state::AppState,
     support_resistance::{SupportResistanceZoneDto, active_zones_from_facts},
@@ -37,6 +38,7 @@ pub fn router(app_state: AppState) -> Router {
         .route("/api/v1/candles", get(candles))
         .route("/api/v1/market-stream", get(market_stream))
         .route("/api/v1/market-metrics/rsi", get(rsi_metrics))
+        .route("/api/v1/market-metrics/range-forecast", get(range_forecast))
         .route("/api/v1/sync-status", get(sync_status))
         .route("/api/v1/support-resistance", get(support_resistance))
         .merge(crate::analysis_api::router())
@@ -232,6 +234,35 @@ async fn rsi_metrics(
         rows.push(RsiMetricDto { timeframe, value });
     }
     Ok(Json(rows))
+}
+
+/// Display only: the typical high-low range of the coming 24 bars.
+async fn range_forecast(
+    State(state): State<AppState>,
+    Query(query): Query<MarketQuery>,
+) -> Result<Json<RangeForecastDto>, ApiError> {
+    let symbol = parse_symbol(&query.symbol)?;
+    let Some(forecaster) = state.range_forecast.as_ref() else {
+        return Ok(Json(RangeForecastDto::unavailable(
+            &symbol,
+            "range forecast model is not configured",
+        )));
+    };
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| {
+            i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
+        });
+    forecaster
+        .forecast(
+            state.markets.as_ref(),
+            state.candles.as_ref(),
+            &symbol,
+            now_ms,
+        )
+        .await
+        .map(Json)
+        .map_err(ApiError::from_service)
 }
 
 async fn market_stream(

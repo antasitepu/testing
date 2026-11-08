@@ -39,6 +39,8 @@ name = "analysis-core"
 version = "0.1.0"
 dependencies = [
  "analysis-domain",
+ "chrono",
+ "chrono-tz",
  "market-domain",
  "rust_decimal",
  "serde",
@@ -261,6 +263,7 @@ dependencies = [
 name = "backtest-engine"
 version = "0.1.0"
 dependencies = [
+ "analysis-core",
  "analysis-domain",
  "analysis-plans",
  "chrono",
