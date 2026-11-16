@@ -17,6 +17,8 @@ const DEFAULT_BACKTEST_MAX_CONCURRENT_RUNS: u16 = 1;
 const DEFAULT_SESSION_OVERRIDES_PATH: &str = "config/commodity-session-overrides.json";
 /// Shipped in every release by `deploy/release.sh` from the private `research/models`.
 const DEFAULT_RANGE_FORECAST_MODEL_PATH: &str = "models/range-forecast-xauusdt-15m-vol-v1.json";
+/// Shipped in every release by `deploy/release.sh`.
+const DEFAULT_MACRO_EVENTS_PATH: &str = "config/macro-events.json";
 const DEFAULT_SESSION_POLICY_VERSION: &str = "commodity-session-policy-v2";
 
 #[derive(Debug, thiserror::Error)]
@@ -48,6 +50,8 @@ pub struct AppConfig {
     /// Frozen display-only range forecast model: `RANGE_FORECAST_MODEL_PATH`, the
     /// release default when unset, `None` when set to `off` or empty.
     pub range_forecast_model: Option<PathBuf>,
+    /// Release calendar for the Range card (`MACRO_EVENTS_PATH`).
+    pub macro_events: PathBuf,
 }
 
 impl AppConfig {
@@ -144,6 +148,11 @@ impl AppConfig {
                 Some("" | "off") => None,
                 Some(path) => Some(PathBuf::from(path)),
             },
+            macro_events: PathBuf::from(value_or(
+                values,
+                "MACRO_EVENTS_PATH",
+                DEFAULT_MACRO_EVENTS_PATH,
+            )),
         })
     }
 }

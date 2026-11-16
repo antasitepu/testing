@@ -202,14 +202,19 @@ fn find_setup(
         Direction::None => return Ok(None),
     };
     let entry = (fvg.low + fvg.high) / Decimal::TWO;
+    let Some(latest_close) = decimal_fact(snapshot, FactKind::MarketClose)? else {
+        return Ok(None);
+    };
+    // A level price has already closed beyond is spent: the tracker cancels
+    // the setup on the first price at or past its target.
     let Some(target) = typed_facts::<LiquidityPool>(&snapshot.target.facts, FactKind::Liquidity)?
         .into_iter()
         .filter(|fact| {
             fact.side == target_side
                 && fact.lifecycle == FactLifecycle::Confirmed
                 && match direction {
-                    Direction::Buy => fact.level > entry,
-                    Direction::Sell => fact.level < entry,
+                    Direction::Buy => fact.level > entry && fact.level > latest_close,
+                    Direction::Sell => fact.level < entry && fact.level < latest_close,
                     Direction::None => false,
                 }
         })

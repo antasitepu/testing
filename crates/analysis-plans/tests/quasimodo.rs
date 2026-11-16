@@ -391,6 +391,61 @@ fn entry_too_far_from_latest_close_does_not_emit_signal() {
     );
 }
 
+fn set_latest_close(snapshot: &mut CanonicalMarketSnapshot, close: &str) {
+    snapshot
+        .target
+        .facts
+        .iter_mut()
+        .find(|fact| fact.id.kind == FactKind::MarketClose)
+        .unwrap()
+        .value = json!({"value": close});
+}
+
+#[test]
+fn target_already_reached_by_latest_close_does_not_emit_signal() {
+    for (direction, close) in [(Direction::Sell, "4050"), (Direction::Buy, "4150")] {
+        let profile = profile(Decimal::new(15, 1));
+        let mut spent = snapshot(direction);
+        set_latest_close(&mut spent, close);
+
+        assert!(
+            QuasimodoEvaluator
+                .evaluate(&profile, &spent, &PlanRuntimeState::neutral(&profile), &[],)
+                .unwrap()
+                .signal
+                .is_none()
+        );
+    }
+}
+
+#[test]
+fn nearest_target_ahead_of_latest_close_replaces_a_reached_one() {
+    let profile = profile(Decimal::new(15, 1));
+    let mut input = snapshot(Direction::Sell);
+    set_latest_close(&mut input, "4050");
+    let far_id = id(FactKind::Liquidity, 80, 180_001);
+    input.target.facts.push(fact(
+        far_id.clone(),
+        LiquidityPool {
+            id: far_id,
+            side: LiquiditySide::SellSide,
+            level: Decimal::new(4_020, 0),
+            lower_bound: Decimal::new(4_019, 0),
+            upper_bound: Decimal::new(4_021, 0),
+            source_swing_ids: Vec::new(),
+            lifecycle: FactLifecycle::Confirmed,
+        },
+    ));
+
+    let signal = QuasimodoEvaluator
+        .evaluate(&profile, &input, &PlanRuntimeState::neutral(&profile), &[])
+        .unwrap()
+        .signal
+        .unwrap();
+
+    assert_eq!(signal.primary_target, Decimal::new(4_020, 0));
+}
+
 fn active_fixture() -> (
     MaterializedProfile,
     CanonicalMarketSnapshot,

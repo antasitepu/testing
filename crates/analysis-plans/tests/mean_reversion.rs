@@ -386,6 +386,36 @@ fn execution_plan_uses_minimum_tick_stop_buffer_when_it_is_wider() {
     }
 }
 
+fn snapshot_with_sequence_low(low: &str) -> CanonicalMarketSnapshot {
+    let mut snapshot = snapshot(Direction::Buy);
+    for fact in &mut snapshot.target.facts {
+        if fact.id.kind == FactKind::Bollinger {
+            fact.value["low"] = json!(low);
+        }
+    }
+    snapshot
+}
+
+#[test]
+fn stop_closer_than_half_an_atr_blocks_signal() {
+    // ATR 10, close 4001, buffer 0.2 ATR: low 4000 leaves 3 of risk, low 3997 leaves 6.
+    let profile = profile();
+    let state = PlanRuntimeState::neutral(&profile);
+    assert!(
+        MeanReversionEvaluator
+            .evaluate(&profile, &snapshot_with_sequence_low("4000"), &state, &[])
+            .unwrap()
+            .signal
+            .is_none()
+    );
+    let signal = MeanReversionEvaluator
+        .evaluate(&profile, &snapshot_with_sequence_low("3997"), &state, &[])
+        .unwrap()
+        .signal
+        .unwrap();
+    assert_eq!(signal.stop_loss, Decimal::new(3_995, 0));
+}
+
 #[test]
 fn regime_rr_and_setup_expiry_block_signal() {
     let base_profile = profile();

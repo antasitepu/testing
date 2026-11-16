@@ -56,8 +56,8 @@ fn profile(release_id: Uuid) -> MaterializedProfile {
 fn execution_plan_changes_all_evaluator_algorithm_versions() {
     assert_eq!(IctEvaluator.algorithm_version(), "ict-v3");
     assert_eq!(SmcEvaluator.algorithm_version(), "smc-v4");
-    assert_eq!(QuasimodoEvaluator.algorithm_version(), "qm-v4");
-    assert_eq!(MeanReversionEvaluator.algorithm_version(), "mean-v3");
+    assert_eq!(QuasimodoEvaluator.algorithm_version(), "qm-v5");
+    assert_eq!(MeanReversionEvaluator.algorithm_version(), "mean-v4");
     assert_eq!(TrendBreakoutEvaluator.algorithm_version(), "trend-v4");
     assert_eq!(RsiEvaluator.algorithm_version(), "rsi-v4");
 }
@@ -82,11 +82,11 @@ fn execution_plan_is_required_for_new_algorithm_identity() {
 #[test]
 fn execution_plan_is_required_for_partial_close_runtime_identities() {
     for algorithm_version in [
-        "ICT-runtime-v4",
+        "ICT-runtime-v5",
         "SMC-runtime-v4",
         "RSI-runtime-v4",
-        "QUASIMODO-runtime-v4",
-        "MEAN_REVERSION-runtime-v3",
+        "QUASIMODO-runtime-v5",
+        "MEAN_REVERSION-runtime-v4",
         "TREND_BREAKOUT-runtime-v4",
     ] {
         let release_id = Uuid::now_v7();

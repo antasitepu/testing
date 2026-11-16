@@ -110,6 +110,7 @@ async fn starts_api_from_mock_binance_and_shuts_down() {
             policy_version: "commodity-session-policy-v1".to_owned(),
         },
         range_forecast_model: None,
+        macro_events: PathBuf::from("config/macro-events.json"),
     };
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     let mut runtime_task = tokio::spawn(runtime::run(config, async move {

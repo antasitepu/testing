@@ -3,7 +3,7 @@
     "plan": "ICT",
     "timeframe": "1m",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v4",
+    "algorithmVersion": "ICT-runtime-v5",
     "parameterVersion": "ICT-1m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -46,7 +46,7 @@
     "plan": "ICT",
     "timeframe": "5m",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v4",
+    "algorithmVersion": "ICT-runtime-v5",
     "parameterVersion": "ICT-5m-runtime-v4-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -89,7 +89,7 @@
     "plan": "ICT",
     "timeframe": "15m",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v4",
+    "algorithmVersion": "ICT-runtime-v5",
     "parameterVersion": "ICT-15m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -132,7 +132,7 @@
     "plan": "ICT",
     "timeframe": "30m",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v4",
+    "algorithmVersion": "ICT-runtime-v5",
     "parameterVersion": "ICT-30m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -175,7 +175,7 @@
     "plan": "ICT",
     "timeframe": "1h",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v4",
+    "algorithmVersion": "ICT-runtime-v5",
     "parameterVersion": "ICT-1h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -218,7 +218,7 @@
     "plan": "ICT",
     "timeframe": "4h",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v4",
+    "algorithmVersion": "ICT-runtime-v5",
     "parameterVersion": "ICT-4h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -261,7 +261,7 @@
     "plan": "ICT",
     "timeframe": "1d",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v4",
+    "algorithmVersion": "ICT-runtime-v5",
     "parameterVersion": "ICT-1d-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -886,7 +886,7 @@
     "plan": "QUASIMODO",
     "timeframe": "1m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "algorithmVersion": "QUASIMODO-runtime-v5",
     "parameterVersion": "QUASIMODO-1m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -927,7 +927,7 @@
     "plan": "QUASIMODO",
     "timeframe": "5m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "algorithmVersion": "QUASIMODO-runtime-v5",
     "parameterVersion": "QUASIMODO-5m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -968,7 +968,7 @@
     "plan": "QUASIMODO",
     "timeframe": "15m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "algorithmVersion": "QUASIMODO-runtime-v5",
     "parameterVersion": "QUASIMODO-15m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1009,7 +1009,7 @@
     "plan": "QUASIMODO",
     "timeframe": "30m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "algorithmVersion": "QUASIMODO-runtime-v5",
     "parameterVersion": "QUASIMODO-30m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1050,7 +1050,7 @@
     "plan": "QUASIMODO",
     "timeframe": "1h",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "algorithmVersion": "QUASIMODO-runtime-v5",
     "parameterVersion": "QUASIMODO-1h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1091,7 +1091,7 @@
     "plan": "QUASIMODO",
     "timeframe": "4h",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "algorithmVersion": "QUASIMODO-runtime-v5",
     "parameterVersion": "QUASIMODO-4h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1132,7 +1132,7 @@
     "plan": "QUASIMODO",
     "timeframe": "1d",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v4",
+    "algorithmVersion": "QUASIMODO-runtime-v5",
     "parameterVersion": "QUASIMODO-1d-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1477,7 +1477,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "1m",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
     "parameterVersion": "MEAN_REVERSION-1m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1521,7 +1521,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "5m",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
     "parameterVersion": "MEAN_REVERSION-5m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1565,7 +1565,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "15m",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
     "parameterVersion": "MEAN_REVERSION-15m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1609,7 +1609,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "30m",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
     "parameterVersion": "MEAN_REVERSION-30m-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1653,7 +1653,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "1h",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
     "parameterVersion": "MEAN_REVERSION-1h-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1697,7 +1697,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "4h",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
     "parameterVersion": "MEAN_REVERSION-4h-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1741,7 +1741,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "1d",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v3",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
     "parameterVersion": "MEAN_REVERSION-1d-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",

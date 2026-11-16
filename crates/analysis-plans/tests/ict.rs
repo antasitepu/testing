@@ -164,6 +164,11 @@ fn snapshot(stale_fvg: bool, target_level: i64, evaluated: i64) -> CanonicalMark
             FactLifecycle::Confirmed,
         ),
         wrapped(atr_id, json!({"value": "10"}), FactLifecycle::Confirmed),
+        wrapped(
+            id(FactKind::MarketClose, Timeframe::M1, 8, 40_000),
+            json!({"value": "4115"}),
+            FactLifecycle::Confirmed,
+        ),
     ];
     let htf_id = id(FactKind::Structure, Timeframe::M5, 0, 35_000);
     CanonicalMarketSnapshot {
@@ -547,6 +552,62 @@ fn opposing_structure_exits_an_open_trade_at_next_open() {
         managed.directives[0].reason,
         "ICT_POST_ENTRY_STRUCTURE_REVERSAL"
     );
+}
+
+fn close_at(snapshot: &mut CanonicalMarketSnapshot, close: &str) {
+    snapshot.target.facts.push(wrapped(
+        id(FactKind::MarketClose, Timeframe::M1, 90, 50_000),
+        json!({"value": close}),
+        FactLifecycle::Confirmed,
+    ));
+}
+
+fn buy_side_pool(level: i64) -> ConfirmedFact<serde_json::Value> {
+    let pool_id = id(FactKind::Liquidity, Timeframe::M1, 80, 35_000);
+    wrapped(
+        pool_id.clone(),
+        LiquidityPool {
+            id: pool_id,
+            side: LiquiditySide::BuySide,
+            level: Decimal::new(level, 0),
+            lower_bound: Decimal::new(level - 1, 0),
+            upper_bound: Decimal::new(level + 1, 0),
+            source_swing_ids: Vec::new(),
+            lifecycle: FactLifecycle::Confirmed,
+        },
+        FactLifecycle::Confirmed,
+    )
+}
+
+#[test]
+fn target_already_reached_by_latest_close_does_not_emit_signal() {
+    let profile = profile(Uuid::now_v7());
+    let mut spent = snapshot(false, 4_200, 59_999);
+    close_at(&mut spent, "4200");
+
+    assert!(
+        IctEvaluator
+            .evaluate(&profile, &spent, &PlanRuntimeState::neutral(&profile), &[])
+            .unwrap()
+            .signal
+            .is_none()
+    );
+}
+
+#[test]
+fn nearest_liquidity_ahead_of_latest_close_replaces_a_reached_one() {
+    let profile = profile(Uuid::now_v7());
+    let mut input = snapshot(false, 4_200, 59_999);
+    close_at(&mut input, "4200");
+    input.target.facts.push(buy_side_pool(4_300));
+
+    let signal = IctEvaluator
+        .evaluate(&profile, &input, &PlanRuntimeState::neutral(&profile), &[])
+        .unwrap()
+        .signal
+        .unwrap();
+
+    assert_eq!(signal.primary_target, Decimal::new(4_300, 0));
 }
 
 #[test]

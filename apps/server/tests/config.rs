@@ -42,6 +42,10 @@ fn production_defaults_are_loopback_and_use_binance_futures() {
             "models/range-forecast-xauusdt-15m-vol-v1.json"
         ))
     );
+    assert_eq!(
+        config.macro_events,
+        std::path::PathBuf::from("config/macro-events.json")
+    );
 }
 
 #[test]

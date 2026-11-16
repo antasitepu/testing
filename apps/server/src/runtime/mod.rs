@@ -321,7 +321,15 @@ where
             path,
             Arc::new(SessionRepository::new(pool.clone())),
         ) {
-            Ok(forecaster) => state.with_range_forecast(Arc::new(forecaster)),
+            Ok(forecaster) => {
+                // A missing calendar only drops the release names from the card.
+                let events = crate::range_forecast::load_macro_events(&config.macro_events)
+                    .unwrap_or_else(|error| {
+                        tracing::warn!(%error, "macro events not loaded");
+                        Vec::new()
+                    });
+                state.with_range_forecast(Arc::new(forecaster.with_events(events)))
+            }
             Err(error) => {
                 tracing::warn!(%error, "range forecast model not loaded");
                 state

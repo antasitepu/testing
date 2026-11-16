@@ -125,7 +125,7 @@ impl PlanEvaluator for MeanReversionEvaluator {
     }
 
     fn algorithm_version(&self) -> &'static str {
-        "mean-v3"
+        "mean-v4"
     }
 
     fn evaluate(
@@ -379,6 +379,11 @@ fn find_setup(
         if !target_valid || risk <= Decimal::ZERO {
             continue;
         }
+        // A stop closer than half an ATR sits inside ordinary bar noise and is
+        // often crossed before the next open can be entered.
+        if risk < atr * min_risk_atr_fraction() {
+            continue;
+        }
         let projected_rr = (reward / risk).round_dp(6);
         if projected_rr < parameters.minimum_rr {
             continue;
@@ -395,6 +400,10 @@ fn find_setup(
         }));
     }
     Ok(None)
+}
+
+fn min_risk_atr_fraction() -> Decimal {
+    Decimal::new(5, 1)
 }
 
 fn build_signal(

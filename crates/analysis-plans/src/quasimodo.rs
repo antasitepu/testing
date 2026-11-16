@@ -48,7 +48,7 @@ impl PlanEvaluator for QuasimodoEvaluator {
     }
 
     fn algorithm_version(&self) -> &'static str {
-        "qm-v4"
+        "qm-v5"
     }
 
     fn evaluate(
@@ -241,6 +241,7 @@ fn find_setup(
             snapshot,
             structure_break.direction,
             shoulder.price,
+            latest_close,
             risk,
             parameters,
         )?
@@ -266,6 +267,7 @@ fn select_target(
     snapshot: &CanonicalMarketSnapshot,
     direction: Direction,
     entry: Decimal,
+    latest_close: Decimal,
     risk: Decimal,
     parameters: &QuasimodoParameters,
 ) -> Result<Option<(FactId, Decimal)>, PlanError> {
@@ -293,10 +295,12 @@ fn select_target(
     candidates
         .into_iter()
         .filter(|(_, level)| {
+            // A level price has already closed beyond is spent: the tracker
+            // cancels the setup on the first price at or past its target.
             let correct_side = if direction == Direction::Sell {
-                *level < entry
+                *level < entry && *level < latest_close
             } else {
-                *level > entry
+                *level > entry && *level > latest_close
             };
             correct_side && (*level - entry).abs() / risk >= parameters.minimum_rr
         })

@@ -4,7 +4,9 @@
 //! `docs/superpowers/specs/2026-11-08-gold-range-forecast-benchmark-design.md`.
 
 use analysis_core::calculate_atr;
-use analysis_core::range_forecast::{HORIZON_BARS, Lookbacks, RangeModel};
+use analysis_core::range_forecast::{
+    HORIZON_BARS, Lookbacks, MacroEvent, MacroEventsFile, RangeModel, events_between,
+};
 use market_domain::{Candle, MarketSession, Symbol, Timeframe};
 use market_service::{CandleStore, MarketStore, ServiceError, SessionStore, expected_open_times};
 use serde::Serialize;
@@ -32,8 +34,38 @@ pub struct RangeForecastDto {
     /// What calibrated ATR14 expects for the same horizon.
     pub atr_range: Option<String>,
     pub model: Option<String>,
+    /// Scheduled US releases (NFP, CPI, FOMC) inside the horizon; a calendar fact.
+    pub events: Vec<RangeEventDto>,
     /// Why no forecast is shown.
     pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RangeEventDto {
+    pub kind: &'static str,
+    /// Epoch milliseconds of the release (FOMC: 14:00 New York).
+    pub time: i64,
+}
+
+/// Scheduled releases touching `[from, until]`, in time order.
+pub fn horizon_events(events: &[MacroEvent], from: i64, until: i64) -> Vec<RangeEventDto> {
+    events_between(events, from, until)
+        .into_iter()
+        .map(|event| RangeEventDto {
+            kind: event.kind.as_str(),
+            time: event.display_time(),
+        })
+        .collect()
+}
+
+/// `config/macro-events.json` (BLS and Federal Reserve Board, public domain).
+pub fn load_macro_events(path: &Path) -> Result<Vec<MacroEvent>, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| format!("read macro events {}: {error}", path.display()))?;
+    let file: MacroEventsFile = serde_json::from_str(&text)
+        .map_err(|error| format!("parse macro events {}: {error}", path.display()))?;
+    file.events()
 }
 
 impl RangeForecastDto {
@@ -47,6 +79,7 @@ impl RangeForecastDto {
             range: None,
             atr_range: None,
             model: None,
+            events: Vec::new(),
             reason: Some(reason.to_owned()),
         }
     }
@@ -65,6 +98,7 @@ pub struct RangeForecaster {
     model: RangeModel,
     timeframe: Timeframe,
     sessions: Arc<dyn SessionStore>,
+    events: Vec<MacroEvent>,
 }
 
 impl RangeForecaster {
@@ -74,7 +108,14 @@ impl RangeForecaster {
             model,
             timeframe,
             sessions,
+            events: Vec::new(),
         })
+    }
+
+    /// Adds the release calendar so the card can name releases in the horizon.
+    pub fn with_events(mut self, events: Vec<MacroEvent>) -> Self {
+        self.events = events;
+        self
     }
 
     pub fn from_file(path: &Path, sessions: Arc<dyn SessionStore>) -> Result<Self, String> {
@@ -132,6 +173,7 @@ impl RangeForecaster {
                 dto.until_time = Some(forecast.until_time);
                 dto.range = Some(format!("{:.2}", forecast.range));
                 dto.atr_range = Some(format!("{:.2}", forecast.atr_range));
+                dto.events = horizon_events(&self.events, forecast.from_time, forecast.until_time);
                 dto.reason = None;
             }
             Err(reason) => dto.reason = Some(reason.to_owned()),

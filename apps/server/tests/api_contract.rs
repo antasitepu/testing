@@ -561,6 +561,7 @@ async fn range_forecast_without_a_model_says_so_instead_of_failing() {
     assert_eq!(body["horizonBars"], 24);
     assert_eq!(body["range"], Value::Null);
     assert_eq!(body["reason"], "range forecast model is not configured");
+    assert_eq!(body["events"], serde_json::json!([]));
 }
 
 #[tokio::test]

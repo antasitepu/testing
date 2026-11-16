@@ -288,6 +288,17 @@ impl MacroEventsFile {
     }
 }
 
+impl MacroEvent {
+    /// The time to show a trader: the release for NFP and CPI; for FOMC 14:00 New
+    /// York, the Board's statement time since 2013 (the interval ends at 14:15).
+    pub fn display_time(&self) -> i64 {
+        match self.kind {
+            EventKind::Fomc => self.end - 15 * 60_000,
+            EventKind::Nfp | EventKind::Cpi => self.start,
+        }
+    }
+}
+
 /// Events touching `[from, to]`: points inside it, or intervals overlapping it.
 /// `events` must be sorted by start, as `MacroEventsFile::events` returns them.
 pub fn events_between(events: &[MacroEvent], from: i64, to: i64) -> Vec<&MacroEvent> {

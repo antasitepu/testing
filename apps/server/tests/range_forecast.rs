@@ -1,6 +1,6 @@
 use analysis_core::calculate_atr;
-use analysis_core::range_forecast::{HORIZON_BARS, RangeModel};
-use gold_monitoring_server::range_forecast::forecast_horizon;
+use analysis_core::range_forecast::{EventKind, HORIZON_BARS, MacroEvent, RangeModel};
+use gold_monitoring_server::range_forecast::{forecast_horizon, horizon_events, load_macro_events};
 use market_domain::{Candle, MarketSession, SessionStatus, Symbol, Timeframe};
 use rust_decimal::Decimal;
 
@@ -191,4 +191,55 @@ async fn live_forecast_from_the_local_database() {
         .expect("forecast");
     println!("RANGE_FORECAST,{}", serde_json::to_string(&dto).unwrap());
     assert_eq!(dto.reason, None, "{dto:?}");
+}
+
+/// The model file that `deploy/release.sh` ships, when present in this checkout
+/// (it is private, so public snapshots skip this check).
+#[test]
+fn the_shipped_model_file_loads_and_validates() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../research/models/range-forecast-xauusdt-15m-vol-v1.json");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        eprintln!("skipped: {} is not in this checkout", path.display());
+        return;
+    };
+    let model: RangeModel = serde_json::from_str(&text).unwrap();
+    assert_eq!(model.validated_timeframe(), Ok(Timeframe::M15));
+    assert_eq!(model.symbol, "XAUUSDT");
+}
+
+fn event(kind: EventKind, start: i64, end: i64) -> MacroEvent {
+    MacroEvent { kind, start, end }
+}
+
+#[test]
+fn the_horizon_lists_releases_inside_it_with_display_times() {
+    const MINUTE: i64 = 60_000;
+    // 2026-01-09 08:30 New York = 13:30 UTC; FOMC 2026-07-29 12:30-14:15 New York (UTC-4).
+    let nfp = 1_767_965_400_000;
+    let fomc_start = 1_785_342_600_000;
+    let events = vec![
+        event(EventKind::Nfp, nfp, nfp),
+        event(EventKind::Fomc, fomc_start, fomc_start + 105 * MINUTE),
+    ];
+    let listed = horizon_events(&events, nfp - 60 * MINUTE, nfp + 300 * MINUTE);
+    assert_eq!(listed.len(), 1);
+    assert_eq!((listed[0].kind, listed[0].time), ("NFP", nfp));
+    // FOMC shows 14:00 New York (18:00 UTC in July), the statement time.
+    let fomc = horizon_events(&events, fomc_start + 90 * MINUTE, fomc_start + 400 * MINUTE);
+    assert_eq!(
+        (fomc[0].kind, fomc[0].time),
+        ("FOMC", fomc_start + 90 * MINUTE)
+    );
+    assert!(horizon_events(&events, nfp + 1, nfp + 60 * MINUTE).is_empty());
+}
+
+#[test]
+fn the_shipped_release_calendar_loads() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/macro-events.json");
+    let events = load_macro_events(&path).unwrap();
+    assert!(events.len() > 600, "{}", events.len());
+    assert!(events.windows(2).all(|pair| pair[0].start <= pair[1].start));
+    assert!(load_macro_events(std::path::Path::new("missing.json")).is_err());
 }
