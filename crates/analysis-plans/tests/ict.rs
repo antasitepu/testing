@@ -580,6 +580,30 @@ fn buy_side_pool(level: i64) -> ConfirmedFact<serde_json::Value> {
 }
 
 #[test]
+fn target_within_half_an_atr_of_latest_close_does_not_emit_signal() {
+    // Target 4200, ATR 10: the close must stay at least 5 short of the target.
+    let profile = profile(Uuid::now_v7());
+    let state = PlanRuntimeState::neutral(&profile);
+    let mut near = snapshot(false, 4_200, 59_999);
+    close_at(&mut near, "4195.01");
+    assert!(
+        IctEvaluator
+            .evaluate(&profile, &near, &state, &[])
+            .unwrap()
+            .signal
+            .is_none()
+    );
+    let mut far_enough = snapshot(false, 4_200, 59_999);
+    close_at(&mut far_enough, "4195");
+    let signal = IctEvaluator
+        .evaluate(&profile, &far_enough, &state, &[])
+        .unwrap()
+        .signal
+        .unwrap();
+    assert_eq!(signal.primary_target, Decimal::new(4_200, 0));
+}
+
+#[test]
 fn target_already_reached_by_latest_close_does_not_emit_signal() {
     let profile = profile(Uuid::now_v7());
     let mut spent = snapshot(false, 4_200, 59_999);

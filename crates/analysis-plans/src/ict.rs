@@ -42,7 +42,7 @@ impl PlanEvaluator for IctEvaluator {
     }
 
     fn algorithm_version(&self) -> &'static str {
-        "ict-v3"
+        "ict-v4"
     }
 
     fn evaluate(
@@ -131,6 +131,10 @@ impl PlanEvaluator for IctEvaluator {
     }
 }
 
+fn min_target_atr_distance() -> Decimal {
+    Decimal::new(5, 1)
+}
+
 fn find_setup(
     snapshot: &CanonicalMarketSnapshot,
     parameters: &IctParameters,
@@ -205,16 +209,26 @@ fn find_setup(
     let Some(latest_close) = decimal_fact(snapshot, FactKind::MarketClose)? else {
         return Ok(None);
     };
+    let atr = decimal_fact(snapshot, FactKind::Atr)?.unwrap_or(Decimal::ZERO);
+    if atr <= Decimal::ZERO {
+        return Ok(None);
+    }
     // A level price has already closed beyond is spent: the tracker cancels
-    // the setup on the first price at or past its target.
+    // the setup on the first price at or past its target. A level within half an
+    // ATR of the close sits inside ordinary bar noise and is spent the same way.
+    let min_distance = atr * min_target_atr_distance();
     let Some(target) = typed_facts::<LiquidityPool>(&snapshot.target.facts, FactKind::Liquidity)?
         .into_iter()
         .filter(|fact| {
             fact.side == target_side
                 && fact.lifecycle == FactLifecycle::Confirmed
                 && match direction {
-                    Direction::Buy => fact.level > entry && fact.level > latest_close,
-                    Direction::Sell => fact.level < entry && fact.level < latest_close,
+                    Direction::Buy => {
+                        fact.level > entry && fact.level >= latest_close + min_distance
+                    }
+                    Direction::Sell => {
+                        fact.level < entry && fact.level <= latest_close - min_distance
+                    }
                     Direction::None => false,
                 }
         })
@@ -222,10 +236,6 @@ fn find_setup(
     else {
         return Ok(None);
     };
-    let atr = decimal_fact(snapshot, FactKind::Atr)?.unwrap_or(Decimal::ZERO);
-    if atr <= Decimal::ZERO {
-        return Ok(None);
-    }
     Ok(Some(IctSetup {
         direction,
         sweep,

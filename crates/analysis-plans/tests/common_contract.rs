@@ -54,7 +54,7 @@ fn profile(release_id: Uuid) -> MaterializedProfile {
 
 #[test]
 fn execution_plan_changes_all_evaluator_algorithm_versions() {
-    assert_eq!(IctEvaluator.algorithm_version(), "ict-v3");
+    assert_eq!(IctEvaluator.algorithm_version(), "ict-v4");
     assert_eq!(SmcEvaluator.algorithm_version(), "smc-v4");
     assert_eq!(QuasimodoEvaluator.algorithm_version(), "qm-v5");
     assert_eq!(MeanReversionEvaluator.algorithm_version(), "mean-v5");
@@ -83,6 +83,7 @@ fn execution_plan_is_required_for_new_algorithm_identity() {
 fn execution_plan_is_required_for_partial_close_runtime_identities() {
     for algorithm_version in [
         "ICT-runtime-v5",
+        "ICT-runtime-v6",
         "SMC-runtime-v4",
         "RSI-runtime-v4",
         "QUASIMODO-runtime-v5",

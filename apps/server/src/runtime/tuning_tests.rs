@@ -444,7 +444,7 @@ fn default_runtime_profiles_use_backtested_ict_rsi_qm_smc_parameters() {
     let release_id = uuid::Uuid::from_u128(1);
     let ict = default_runtime_profile(release_id, symbol.clone(), PlanKind::Ict, Timeframe::M1)
         .expect("ict profile");
-    assert_eq!(ict.versions.algorithm_version, "ICT-runtime-v5");
+    assert_eq!(ict.versions.algorithm_version, "ICT-runtime-v6");
     assert_eq!(ict.versions.parameter_version, "ICT-1m-runtime-v3-pp1-pc1");
     let PlanParameters::Ict(ict) = ict.parameters else {
         panic!("expected ICT parameters");
@@ -509,7 +509,7 @@ fn partial_close_runtime_profiles_use_isolated_versions() {
     let symbol = Symbol::new("XAUUSDT").expect("symbol");
     let release_id = uuid::Uuid::from_u128(1);
     for (plan, expected_algorithm) in [
-        (PlanKind::Ict, "ICT-runtime-v5"),
+        (PlanKind::Ict, "ICT-runtime-v6"),
         (PlanKind::Smc, "SMC-runtime-v4"),
         (PlanKind::Rsi, "RSI-runtime-v4"),
         (PlanKind::Quasimodo, "QUASIMODO-runtime-v5"),

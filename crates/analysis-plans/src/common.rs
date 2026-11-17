@@ -196,6 +196,7 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
     matches!(
         algorithm_version,
         "ict-v3"
+            | "ict-v4"
             | "smc-v3"
             | "smc-v4"
             | "rsi-v4"
@@ -211,6 +212,7 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
             | "ICT-runtime-v3"
             | "ICT-runtime-v4"
             | "ICT-runtime-v5"
+            | "ICT-runtime-v6"
             | "SMC-runtime-v3"
             | "SMC-runtime-v4"
             | "RSI-runtime-v4"

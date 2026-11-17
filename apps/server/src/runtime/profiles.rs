@@ -600,7 +600,7 @@ fn runtime_algorithm_version(plan: PlanKind) -> String {
         PlanKind::Rsi => "RSI-runtime-v4".to_owned(),
         PlanKind::TrendBreakout => "TREND_BREAKOUT-runtime-v4".to_owned(),
         PlanKind::Quasimodo => "QUASIMODO-runtime-v5".to_owned(),
-        PlanKind::Ict => "ICT-runtime-v5".to_owned(),
+        PlanKind::Ict => "ICT-runtime-v6".to_owned(),
         PlanKind::Smc => "SMC-runtime-v4".to_owned(),
         PlanKind::MeanReversion => "MEAN_REVERSION-runtime-v5".to_owned(),
         PlanKind::SessionBreakout => "SESSION_BREAKOUT-runtime-v1".to_owned(),
