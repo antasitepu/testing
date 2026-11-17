@@ -513,7 +513,7 @@ fn partial_close_runtime_profiles_use_isolated_versions() {
         (PlanKind::Smc, "SMC-runtime-v4"),
         (PlanKind::Rsi, "RSI-runtime-v4"),
         (PlanKind::Quasimodo, "QUASIMODO-runtime-v5"),
-        (PlanKind::MeanReversion, "MEAN_REVERSION-runtime-v4"),
+        (PlanKind::MeanReversion, "MEAN_REVERSION-runtime-v5"),
         (PlanKind::TrendBreakout, "TREND_BREAKOUT-runtime-v4"),
     ] {
         let profile = default_runtime_profile(release_id, symbol.clone(), plan, Timeframe::M1)

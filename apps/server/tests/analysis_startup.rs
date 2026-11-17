@@ -590,9 +590,10 @@ async fn runtime_bootstrap_creates_active_release_for_every_plan_and_work_hook()
         let parameter_version: String = row.get("parameter_version");
         let position_management: Value = row.get("position_management");
         let expected_algorithm = match plan.as_str() {
-            "ICT" | "SMC" | "RSI" | "QUASIMODO" | "TREND_BREAKOUT" => format!("{plan}-runtime-v4"),
-            "SESSION_BREAKOUT" | "VOLATILITY_SQUEEZE" => format!("{plan}-runtime-v1"),
-            _ => format!("{plan}-runtime-v3"),
+            "ICT" | "QUASIMODO" => format!("{plan}-runtime-v5"),
+            "SMC" | "RSI" | "TREND_BREAKOUT" => format!("{plan}-runtime-v4"),
+            "MEAN_REVERSION" => format!("{plan}-runtime-v5"),
+            _ => format!("{plan}-runtime-v1"),
         };
         assert_eq!(algorithm_version, expected_algorithm);
         assert!(parameter_version.ends_with("-pp1-pc1"));
@@ -952,6 +953,7 @@ async fn runtime_resumes_pending_analysis_work_after_recent_sync_and_shuts_down(
     let config = AppConfig {
         bind,
         public_host: None,
+        auth_required: false,
         database_url: database_url.clone(),
         binance_rest_base_url: fixture.base_url.clone(),
         binance_ws_base_url: Url::parse("ws://127.0.0.1:9/market").unwrap(),

@@ -2,6 +2,10 @@
 
 pub mod analysis_api;
 pub mod api;
+pub mod auth;
+pub mod auth_api;
+#[cfg(test)]
+mod auth_tests;
 pub mod backtest_api;
 pub mod config;
 pub mod deployment_rollover;

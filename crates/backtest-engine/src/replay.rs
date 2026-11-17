@@ -77,6 +77,8 @@ pub struct BacktestReplayResult {
     pub metrics: BacktestMetrics,
     pub trades: Vec<BacktestTrade>,
     pub executions: Vec<SimulatedExecution>,
+    /// When each emitted signal became effective, so counts can be split by window.
+    pub signal_times: Vec<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -150,6 +152,7 @@ impl BacktestReplay {
                 .map_err(|_| BacktestReplayError::InvalidSpread)?,
             state: PlanRuntimeState::neutral(&self.profile),
             pending_signals: Vec::new(),
+            signal_times: Vec::new(),
             pending_directives: Vec::new(),
             executions: Vec::new(),
             trades: Vec::new(),
@@ -181,6 +184,7 @@ pub struct BacktestReplaySession<'a> {
     execution: OhlcConservativeExecution,
     state: PlanRuntimeState,
     pending_signals: Vec<SignalDefinition>,
+    signal_times: Vec<i64>,
     pending_directives: Vec<ManagementDirective>,
     executions: Vec<SimulatedExecution>,
     trades: Vec<BacktestTrade>,
@@ -329,6 +333,7 @@ impl BacktestReplaySession<'_> {
             .map_err(BacktestReplayError::Evaluation)?;
         self.state = evaluation.next_state;
         if let Some(signal) = evaluation.signal {
+            self.signal_times.push(signal.effective_at);
             self.pending_signals.push(signal);
         }
         self.pending_directives
@@ -351,6 +356,7 @@ impl BacktestReplaySession<'_> {
             metrics,
             trades: self.trades,
             executions: self.executions,
+            signal_times: self.signal_times,
         }
     }
 }

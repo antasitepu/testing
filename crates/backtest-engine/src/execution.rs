@@ -95,7 +95,13 @@ pub struct SimulatedExecution {
     pub price: Decimal,
     pub kind: ExecutionKind,
     pub ambiguous_intrabar: bool,
+    /// Why a pending entry was cancelled, in the live tracker's words.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
+
+const TARGET_TOUCHED_BEFORE_ENTRY: &str = "target touched before entry";
+const STOP_TOUCHED_BEFORE_ENTRY: &str = "stop touched before entry";
 
 pub trait ExecutionAdapter {
     fn model(&self) -> ExecutionModel;
@@ -150,7 +156,45 @@ impl OhlcConservativeExecution {
             price,
             kind,
             ambiguous_intrabar,
+            reason: None,
         }
+    }
+
+    fn cancelled(
+        signal_id: Uuid,
+        candle: &Candle,
+        price: Decimal,
+        reason: &str,
+        ambiguous_intrabar: bool,
+    ) -> SimulatedExecution {
+        SimulatedExecution {
+            reason: Some(reason.to_owned()),
+            ..Self::execution(
+                signal_id,
+                candle,
+                price,
+                ExecutionKind::EntryCancelled,
+                ambiguous_intrabar,
+            )
+        }
+    }
+}
+
+/// The stop or target a price range reached, stop first as in the live tracker.
+fn touched_before_entry(
+    signal: &SignalDefinition,
+    low: Decimal,
+    high: Decimal,
+) -> Option<(&'static str, Decimal)> {
+    let (stop, target) = match signal.direction {
+        Direction::Buy => (low <= signal.stop_loss, high >= signal.primary_target),
+        Direction::Sell => (high >= signal.stop_loss, low <= signal.primary_target),
+        Direction::None => return None,
+    };
+    if stop {
+        Some((STOP_TOUCHED_BEFORE_ENTRY, signal.stop_loss))
+    } else {
+        target.then_some((TARGET_TOUCHED_BEFORE_ENTRY, signal.primary_target))
     }
 }
 
@@ -167,6 +211,17 @@ impl ExecutionAdapter for OhlcConservativeExecution {
             .spread
             .quote_candle(next, signal.direction == Direction::Buy);
         let next = &quote;
+        // Like the live tracker, a pending entry dies once price reaches its stop
+        // or target. The open is checked for every plan (live: canonical open).
+        if let Some((reason, price)) = touched_before_entry(signal, next.open, next.open) {
+            return vec![Self::cancelled(
+                signal.signal_id,
+                next,
+                price,
+                reason,
+                false,
+            )];
+        }
         let entry = match signal.execution_instruction {
             ExecutionInstruction::NextOpen => {
                 let rejected = match signal.plan {
@@ -201,6 +256,26 @@ impl ExecutionAdapter for OhlcConservativeExecution {
                 }
             }),
         };
+        // Inside the candle the target cancels a limit entry that did not fill at
+        // the open. Zone and target in one candle cannot be ordered, so that case is
+        // cancelled and flagged ambiguous. A stop after an open between stop and zone
+        // is left to the fill rule below, as before.
+        if signal.execution_instruction == ExecutionInstruction::LimitZone
+            && entry != Some(next.open)
+        {
+            let (low, high) = (next.low, next.high);
+            if let Some((reason, price)) = touched_before_entry(signal, low, high)
+                .filter(|(reason, _)| *reason == TARGET_TOUCHED_BEFORE_ENTRY)
+            {
+                return vec![Self::cancelled(
+                    signal.signal_id,
+                    next,
+                    price,
+                    reason,
+                    entry.is_some(),
+                )];
+            }
+        }
         let Some(entry) = entry else {
             return Vec::new();
         };

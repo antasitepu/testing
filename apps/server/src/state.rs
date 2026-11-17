@@ -1,3 +1,4 @@
+use crate::auth::AuthService;
 use crate::execution_wake::ExecutionWakeSource;
 use crate::range_forecast::RangeForecaster;
 use crate::runtime::health::RuntimeHealthReader;
@@ -23,6 +24,8 @@ pub struct AppState {
     pub runtime_health: RuntimeHealthReader,
     /// Display-only range forecast; `None` when no model file is configured.
     pub range_forecast: Option<Arc<RangeForecaster>>,
+    /// Application login; `None` leaves the API open, for loopback-only use.
+    pub auth: Option<Arc<AuthService>>,
     pub default_history_limit: u16,
 }
 
@@ -49,6 +52,7 @@ impl AppState {
             scalping_audits: None,
             runtime_health: RuntimeHealthReader::starting(0),
             range_forecast: None,
+            auth: None,
             default_history_limit,
         }
     }
@@ -98,6 +102,11 @@ impl AppState {
 
     pub fn with_runtime_health(mut self, runtime_health: RuntimeHealthReader) -> Self {
         self.runtime_health = runtime_health;
+        self
+    }
+
+    pub fn with_auth(mut self, auth: Arc<AuthService>) -> Self {
+        self.auth = Some(auth);
         self
     }
 

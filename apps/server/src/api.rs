@@ -42,6 +42,7 @@ pub fn router(app_state: AppState) -> Router {
         .route("/api/v1/sync-status", get(sync_status))
         .route("/api/v1/support-resistance", get(support_resistance))
         .merge(crate::analysis_api::router())
+        .merge(crate::auth_api::router())
         .merge(crate::backtest_api::router())
         .merge(crate::health_api::router())
         .merge(crate::monitoring_api::router())

@@ -386,34 +386,38 @@ fn execution_plan_uses_minimum_tick_stop_buffer_when_it_is_wider() {
     }
 }
 
-fn snapshot_with_sequence_low(low: &str) -> CanonicalMarketSnapshot {
+fn tight_stop_signal(timeframe: Timeframe, low: &str) -> Option<SignalDefinition> {
+    let mut profile = profile();
+    profile.key.target_timeframe = timeframe;
     let mut snapshot = snapshot(Direction::Buy);
+    snapshot.target_timeframe = timeframe;
     for fact in &mut snapshot.target.facts {
         if fact.id.kind == FactKind::Bollinger {
             fact.value["low"] = json!(low);
         }
     }
-    snapshot
+    MeanReversionEvaluator
+        .evaluate(
+            &profile,
+            &snapshot,
+            &PlanRuntimeState::neutral(&profile),
+            &[],
+        )
+        .unwrap()
+        .signal
 }
 
 #[test]
-fn stop_closer_than_half_an_atr_blocks_signal() {
+fn stop_closer_than_half_an_atr_blocks_signal_on_1m_5m_and_15m_only() {
     // ATR 10, close 4001, buffer 0.2 ATR: low 4000 leaves 3 of risk, low 3997 leaves 6.
-    let profile = profile();
-    let state = PlanRuntimeState::neutral(&profile);
-    assert!(
-        MeanReversionEvaluator
-            .evaluate(&profile, &snapshot_with_sequence_low("4000"), &state, &[])
-            .unwrap()
-            .signal
-            .is_none()
-    );
-    let signal = MeanReversionEvaluator
-        .evaluate(&profile, &snapshot_with_sequence_low("3997"), &state, &[])
-        .unwrap()
-        .signal
-        .unwrap();
-    assert_eq!(signal.stop_loss, Decimal::new(3_995, 0));
+    for timeframe in [Timeframe::M1, Timeframe::M5, Timeframe::M15] {
+        assert!(tight_stop_signal(timeframe, "4000").is_none());
+        let signal = tight_stop_signal(timeframe, "3997").unwrap();
+        assert_eq!(signal.stop_loss, Decimal::new(3_995, 0));
+    }
+    for timeframe in [Timeframe::M30, Timeframe::H1] {
+        assert!(tight_stop_signal(timeframe, "4000").is_some());
+    }
 }
 
 #[test]

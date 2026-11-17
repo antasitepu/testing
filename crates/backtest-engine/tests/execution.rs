@@ -135,9 +135,70 @@ fn limit_zone_uses_first_reachable_boundary_and_gap_over_zone_does_not_fill() {
     let mut model = OhlcConservativeExecution::new();
     assert!(
         model
-            .on_signal(&limit, &candle(60_000, 115, 120, 114, 118))
+            .on_signal(&limit, &candle(60_000, 115, 119, 114, 118))
             .is_empty()
     );
+}
+
+#[test]
+fn pending_entry_is_cancelled_once_price_reaches_target_or_stop_like_live() {
+    let limit = signal(
+        PlanKind::Ict,
+        ExecutionInstruction::LimitZone,
+        Direction::Buy,
+    );
+    let reason = |executions: &[backtest_engine::SimulatedExecution]| {
+        assert_eq!(executions.len(), 1);
+        assert_eq!(executions[0].kind, ExecutionKind::EntryCancelled);
+        (
+            executions[0].reason.clone().unwrap(),
+            executions[0].price,
+            executions[0].ambiguous_intrabar,
+        )
+    };
+    // Above the zone, the candle reaches the target without retracing.
+    let mut model = OhlcConservativeExecution::new();
+    let cancelled = model.on_signal(&limit, &candle(60_000, 115, 120, 114, 118));
+    assert_eq!(
+        reason(&cancelled),
+        (
+            "target touched before entry".to_owned(),
+            Decimal::new(120, 0),
+            false
+        )
+    );
+    // Zone and target in one candle cannot be ordered: cancelled and ambiguous.
+    let mut model = OhlcConservativeExecution::new();
+    let cancelled = model.on_signal(&limit, &candle(60_000, 115, 121, 108, 118));
+    assert!(reason(&cancelled).2);
+    // An open inside the zone fills first, even if the target follows.
+    let mut model = OhlcConservativeExecution::new();
+    let filled = model.on_signal(&limit, &candle(60_000, 105, 121, 104, 118));
+    assert_eq!(filled[0].kind, ExecutionKind::Entry);
+    // An open at or beyond the stop cancels before any fill.
+    let mut model = OhlcConservativeExecution::new();
+    let cancelled = model.on_signal(&limit, &candle(60_000, 89, 101, 88, 100));
+    assert_eq!(reason(&cancelled).0, "stop touched before entry");
+
+    // Next-open entries are checked at the open, for every plan.
+    let next_open = signal(
+        PlanKind::TrendBreakout,
+        ExecutionInstruction::NextOpen,
+        Direction::Sell,
+    );
+    let mut model = OhlcConservativeExecution::new();
+    let cancelled = model.on_signal(&next_open, &candle(60_000, 80, 82, 79, 81));
+    assert_eq!(
+        reason(&cancelled),
+        (
+            "target touched before entry".to_owned(),
+            Decimal::new(80, 0),
+            false
+        )
+    );
+    let mut model = OhlcConservativeExecution::new();
+    let entered = model.on_signal(&next_open, &candle(60_000, 100, 120, 70, 90));
+    assert_eq!(entered[0].kind, ExecutionKind::Entry);
 }
 
 #[test]

@@ -36,6 +36,8 @@ pub struct AppConfig {
     pub bind: SocketAddr,
     /// The one public host a reverse proxy may forward, besides loopback.
     pub public_host: Option<String>,
+    /// Application login. Always on with a public host; `APP_AUTH=on` enables it locally.
+    pub auth_required: bool,
     pub database_url: String,
     pub binance_rest_base_url: Url,
     pub binance_ws_base_url: Url,
@@ -67,6 +69,18 @@ impl AppConfig {
             return Err(ConfigError::NonLoopback);
         }
         let public_host = parse_public_host(values)?;
+        let auth_required = match value_or(values, "APP_AUTH", "").trim() {
+            "on" => true,
+            "" => public_host.is_some(),
+            "off" if public_host.is_none() => false,
+            "off" => {
+                return Err(invalid(
+                    "APP_AUTH",
+                    "login cannot be turned off while APP_PUBLIC_HOST is set",
+                ));
+            }
+            _ => return Err(invalid("APP_AUTH", "must be on or off")),
+        };
 
         let binance_rest_base_url = parse_url(
             values,
@@ -117,6 +131,7 @@ impl AppConfig {
         Ok(Self {
             bind,
             public_host,
+            auth_required,
             database_url,
             binance_rest_base_url,
             binance_ws_base_url,

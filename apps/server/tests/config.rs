@@ -195,3 +195,25 @@ fn endpoint_schemes_are_validated() {
         })
     ));
 }
+
+#[test]
+fn login_follows_the_public_host_and_cannot_be_turned_off_there() {
+    assert!(!AppConfig::from_values(&values()).unwrap().auth_required);
+
+    let mut local_login = values();
+    local_login.insert("APP_AUTH".to_owned(), "on".to_owned());
+    assert!(AppConfig::from_values(&local_login).unwrap().auth_required);
+
+    let mut public = values();
+    public.insert("APP_PUBLIC_HOST".to_owned(), "trade.example.com".to_owned());
+    assert!(AppConfig::from_values(&public).unwrap().auth_required);
+
+    public.insert("APP_AUTH".to_owned(), "off".to_owned());
+    assert!(matches!(
+        AppConfig::from_values(&public),
+        Err(ConfigError::Invalid {
+            name: "APP_AUTH",
+            ..
+        })
+    ));
+}

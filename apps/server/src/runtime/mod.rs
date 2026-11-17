@@ -337,6 +337,14 @@ where
         },
         None => state,
     };
+    let state = if config.auth_required {
+        state.with_auth(Arc::new(crate::auth::AuthService::new(
+            pool.clone(),
+            config.public_host.is_some(),
+        )))
+    } else {
+        state
+    };
     let app = build_router(state, &config.static_dir, config.public_host.as_deref());
     let listener = TcpListener::bind(config.bind).await?;
     tracing::info!(address = %listener.local_addr()?, "gold monitoring server listening");
@@ -736,17 +744,26 @@ async fn create_runtime_release(
 pub fn build_router(state: AppState, static_dir: &Path, public_host: Option<&str>) -> Router {
     let static_files =
         ServeDir::new(static_dir).not_found_service(ServeFile::new(static_dir.join("index.html")));
-    Router::new()
+    let auth = state.auth.clone();
+    let router = Router::new()
         .merge(api::router(state))
-        .fallback_service(static_files)
-        .layer(axum::middleware::from_fn_with_state(
-            public_host.map(Arc::<str>::from),
-            crate::loopback_guard::require_loopback_client,
-        ))
+        .fallback_service(static_files);
+    let router = match auth {
+        Some(auth) => router.layer(axum::middleware::from_fn_with_state(
+            auth,
+            crate::auth_api::require_session,
+        )),
+        None => router,
+    };
+    router.layer(axum::middleware::from_fn_with_state(
+        public_host.map(Arc::<str>::from),
+        crate::loopback_guard::require_loopback_client,
+    ))
 }
 
 #[cfg(test)]
-static TEST_DB_LOCK: std::sync::OnceLock<Arc<tokio::sync::Mutex<()>>> = std::sync::OnceLock::new();
+pub(crate) static TEST_DB_LOCK: std::sync::OnceLock<Arc<tokio::sync::Mutex<()>>> =
+    std::sync::OnceLock::new();
 
 #[cfg(test)]
 mod profile_contract_tests;

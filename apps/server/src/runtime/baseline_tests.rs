@@ -812,6 +812,7 @@ async fn print_runtime_baseline_from_database() {
                 "executions": result.executions, "positionManagement": profile.position_management,
                     "entries": result.executions.iter().filter(|e| matches!(e.kind, backtest_engine::ExecutionKind::Entry | backtest_engine::ExecutionKind::ReverseEntry)).count(),
                     "ambiguousExecutions": result.executions.iter().filter(|e| e.ambiguous_intrabar).count(),
+                    "signalTimes": result.signal_times,
                 })
             );
             if let (Some(windows), Some(outcomes)) = (&edge_windows, &edge_outcomes) {

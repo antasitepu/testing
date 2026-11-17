@@ -1477,7 +1477,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "1m",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v5",
     "parameterVersion": "MEAN_REVERSION-1m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1521,7 +1521,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "5m",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v5",
     "parameterVersion": "MEAN_REVERSION-5m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1565,7 +1565,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "15m",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v5",
     "parameterVersion": "MEAN_REVERSION-15m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1609,7 +1609,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "30m",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v5",
     "parameterVersion": "MEAN_REVERSION-30m-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1653,7 +1653,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "1h",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v5",
     "parameterVersion": "MEAN_REVERSION-1h-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1697,7 +1697,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "4h",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v5",
     "parameterVersion": "MEAN_REVERSION-4h-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",
@@ -1741,7 +1741,7 @@
     "plan": "MEAN_REVERSION",
     "timeframe": "1d",
     "enabled": true,
-    "algorithmVersion": "MEAN_REVERSION-runtime-v4",
+    "algorithmVersion": "MEAN_REVERSION-runtime-v5",
     "parameterVersion": "MEAN_REVERSION-1d-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "MEAN_REVERSION",

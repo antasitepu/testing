@@ -95,6 +95,7 @@ async fn starts_api_from_mock_binance_and_shuts_down() {
     let config = AppConfig {
         bind,
         public_host: None,
+        auth_required: false,
         database_url: database_url.clone(),
         binance_rest_base_url: fixture.base_url.clone(),
         binance_ws_base_url: Url::parse("ws://127.0.0.1:9/market").unwrap(),
