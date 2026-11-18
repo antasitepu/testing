@@ -632,7 +632,7 @@ fn runtime_algorithm_version(plan: PlanKind) -> String {
         PlanKind::MeanReversion => "MEAN_REVERSION-runtime-v5".to_owned(),
         PlanKind::SessionBreakout => "SESSION_BREAKOUT-runtime-v1".to_owned(),
         PlanKind::VolatilitySqueeze => "VOLATILITY_SQUEEZE-runtime-v1".to_owned(),
-        PlanKind::Harmonic => "HARMONIC-runtime-v1".to_owned(),
+        PlanKind::Harmonic => "HARMONIC-runtime-v2".to_owned(),
         PlanKind::HarmonicConfirm => "HARMONIC_CONFIRM-runtime-v1".to_owned(),
     }
 }

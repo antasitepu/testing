@@ -2362,7 +2362,7 @@
     "plan": "HARMONIC",
     "timeframe": "1m",
     "enabled": false,
-    "algorithmVersion": "HARMONIC-runtime-v1",
+    "algorithmVersion": "HARMONIC-runtime-v2",
     "parameterVersion": "HARMONIC-1m-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "HARMONIC",
@@ -2404,7 +2404,7 @@
     "plan": "HARMONIC",
     "timeframe": "5m",
     "enabled": false,
-    "algorithmVersion": "HARMONIC-runtime-v1",
+    "algorithmVersion": "HARMONIC-runtime-v2",
     "parameterVersion": "HARMONIC-5m-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "HARMONIC",
@@ -2446,7 +2446,7 @@
     "plan": "HARMONIC",
     "timeframe": "15m",
     "enabled": false,
-    "algorithmVersion": "HARMONIC-runtime-v1",
+    "algorithmVersion": "HARMONIC-runtime-v2",
     "parameterVersion": "HARMONIC-15m-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "HARMONIC",
@@ -2488,7 +2488,7 @@
     "plan": "HARMONIC",
     "timeframe": "30m",
     "enabled": false,
-    "algorithmVersion": "HARMONIC-runtime-v1",
+    "algorithmVersion": "HARMONIC-runtime-v2",
     "parameterVersion": "HARMONIC-30m-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "HARMONIC",
@@ -2530,7 +2530,7 @@
     "plan": "HARMONIC",
     "timeframe": "1h",
     "enabled": false,
-    "algorithmVersion": "HARMONIC-runtime-v1",
+    "algorithmVersion": "HARMONIC-runtime-v2",
     "parameterVersion": "HARMONIC-1h-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "HARMONIC",
@@ -2572,7 +2572,7 @@
     "plan": "HARMONIC",
     "timeframe": "4h",
     "enabled": false,
-    "algorithmVersion": "HARMONIC-runtime-v1",
+    "algorithmVersion": "HARMONIC-runtime-v2",
     "parameterVersion": "HARMONIC-4h-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "HARMONIC",
@@ -2614,7 +2614,7 @@
     "plan": "HARMONIC",
     "timeframe": "1d",
     "enabled": false,
-    "algorithmVersion": "HARMONIC-runtime-v1",
+    "algorithmVersion": "HARMONIC-runtime-v2",
     "parameterVersion": "HARMONIC-1d-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "HARMONIC",

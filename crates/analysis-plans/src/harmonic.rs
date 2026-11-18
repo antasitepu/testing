@@ -1,11 +1,12 @@
-//! Harmonic Crab plans: `HARMONIC` (`harmonic-crab-limit-v1`) and
+//! Harmonic Crab plans: `HARMONIC` (`harmonic-crab-limit-v2`) and
 //! `HARMONIC_CONFIRM` (`harmonic-crab-confirm-v1`).
 //!
-//! Pre-registered in `docs/superpowers/specs/2026-11-18-harmonic-crab-plan-design.md`:
-//! an ATR zigzag over the confirmed swings yields X-A-B-C with Crab ratios and a
-//! PRZ centred on the 1.618 extension of XA. The limit plan waits in the PRZ
-//! from the bar C is confirmed; the confirm plan enters at the next open after
-//! a D swing is confirmed inside the PRZ.
+//! Pre-registered in `docs/superpowers/specs/2026-11-18-harmonic-crab-plan-design.md`
+//! and `2026-11-18-harmonic-crab-limit-v2-design.md`: an ATR zigzag over the
+//! confirmed swings yields X-A-B-C with Crab ratios and a PRZ centred on the
+//! 1.618 extension of XA. The limit plan waits in the PRZ once a close has passed
+//! X (its primary target), once per C; the confirm plan enters at the next open
+//! after a D swing is confirmed inside the PRZ.
 
 use crate::common::{
     TargetExtensionRequest, apply_shared_trade_feedback, decimal_fact, deterministic_uuid,
@@ -29,6 +30,11 @@ use analysis_domain::{
 };
 use market_domain::Timeframe;
 use rust_decimal::Decimal;
+use serde_json::Value;
+
+/// Runtime-state key holding the confirmation time of the last C the limit plan
+/// signalled, kept beside the shared trade state.
+const SIGNALLED_C_KEY: &str = "harmonicSignalledC";
 
 pub struct HarmonicEvaluator;
 pub struct HarmonicConfirmEvaluator;
@@ -75,7 +81,7 @@ impl PlanEvaluator for HarmonicEvaluator {
     }
 
     fn algorithm_version(&self) -> &'static str {
-        "harmonic-crab-limit-v1"
+        "harmonic-crab-limit-v2"
     }
 
     fn evaluate(
@@ -129,12 +135,51 @@ struct HarmonicSetup {
     latest_close: Decimal,
 }
 
+fn signalled_c(internal: &Value) -> Option<i64> {
+    internal.get(SIGNALLED_C_KEY).and_then(Value::as_i64)
+}
+
+fn remember_signalled_c(state: &mut PlanRuntimeState, confirmed_at: i64) -> Result<(), PlanError> {
+    match &mut state.internal {
+        Value::Null => {
+            state.internal = serde_json::json!({ SIGNALLED_C_KEY: confirmed_at });
+        }
+        Value::Object(map) => {
+            map.insert(SIGNALLED_C_KEY.to_owned(), Value::from(confirmed_at));
+        }
+        _ => {
+            return Err(PlanError::Serialization(
+                "harmonic runtime state is not an object".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// The shared trade state rewrites or clears `internal`; the remembered C is put
+/// back after every evaluation so one C never signals twice.
 fn evaluate(
     mode: EntryMode,
     profile: &MaterializedProfile,
     snapshot: &CanonicalMarketSnapshot,
     state: &PlanRuntimeState,
     feedback: &[PlanFeedback],
+) -> Result<PlanEvaluation, PlanError> {
+    let remembered = signalled_c(&state.internal);
+    let mut evaluation = evaluate_inner(mode, profile, snapshot, state, feedback, remembered)?;
+    if let Some(latest) = signalled_c(&evaluation.next_state.internal).max(remembered) {
+        remember_signalled_c(&mut evaluation.next_state, latest)?;
+    }
+    Ok(evaluation)
+}
+
+fn evaluate_inner(
+    mode: EntryMode,
+    profile: &MaterializedProfile,
+    snapshot: &CanonicalMarketSnapshot,
+    state: &PlanRuntimeState,
+    feedback: &[PlanFeedback],
+    remembered: Option<i64>,
 ) -> Result<PlanEvaluation, PlanError> {
     if profile.key.plan != mode.plan() || snapshot.target_timeframe != profile.key.target_timeframe
     {
@@ -178,7 +223,7 @@ fn evaluate(
         next_state.setup_state = SetupState::Watching;
         return Ok(empty_evaluation(next_state));
     }
-    let Some(setup) = find_setup(mode, snapshot, parameters)? else {
+    let Some(setup) = find_setup(mode, snapshot, parameters, remembered)? else {
         next_state.setup_state = SetupState::Watching;
         return Ok(empty_evaluation(next_state));
     };
@@ -207,6 +252,9 @@ fn evaluate(
         reason: None,
     };
     append_event(&mut next_state, &event)?;
+    if mode == EntryMode::Limit {
+        remember_signalled_c(&mut next_state, setup.pattern.c.confirmed_at)?;
+    }
     Ok(PlanEvaluation {
         next_state,
         signal: Some(signal),
@@ -305,6 +353,7 @@ fn find_setup(
     mode: EntryMode,
     snapshot: &CanonicalMarketSnapshot,
     parameters: &HarmonicParameters,
+    remembered: Option<i64>,
 ) -> Result<Option<HarmonicSetup>, PlanError> {
     let Some(atr) = decimal_fact(snapshot, FactKind::Atr)? else {
         return Ok(None);
@@ -338,18 +387,30 @@ fn find_setup(
             let [.., x, a, b, c] = pivots.as_slice() else {
                 return Ok(None);
             };
-            if c.confirmed_at != evaluated {
+            let arm_window = snapshot
+                .target_timeframe
+                .duration_ms()
+                .checked_mul(i64::from(parameters.max_bars_valid))
+                .ok_or_else(|| {
+                    PlanError::Serialization("harmonic arm window overflow".to_owned())
+                })?;
+            if remembered.is_some_and(|time| time >= c.confirmed_at)
+                || evaluated < c.confirmed_at
+                || evaluated - c.confirmed_at > arm_window
+            {
                 return Ok(None);
             }
             let Some(pattern) = crab(x, a, b, c, parameters.ratio_tolerance, prz_half_width) else {
                 return Ok(None);
             };
-            let outside_prz = match pattern.direction {
-                Direction::Buy => latest_close > pattern.prz_high && latest_close <= c.price,
-                Direction::Sell => latest_close < pattern.prz_low && latest_close >= c.price,
+            // v2: arm only once the close has passed X (the primary target) and
+            // is still short of the PRZ.
+            let armed = match pattern.direction {
+                Direction::Buy => latest_close <= x.price && latest_close > pattern.prz_high,
+                Direction::Sell => latest_close >= x.price && latest_close < pattern.prz_low,
                 Direction::None => false,
             };
-            if !outside_prz {
+            if !armed {
                 return Ok(None);
             }
             HarmonicSetup {

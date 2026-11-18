@@ -3,7 +3,7 @@ use analysis_domain::{
     CanonicalMarketSnapshot, ConfirmedFact, Direction, DirectiveKind, ExecutionInstruction, FactId,
     FactKind, FactLifecycle, HarmonicParameters, HarmonicPattern, MaterializedProfile, PlanKind,
     PlanParameters, PlanProfileKey, PrimitiveVersion, Readiness, SignalDefinition, SignalEventKind,
-    TimeframeFacts, VersionIdentity,
+    TimeframeFacts, TradeState, VersionIdentity,
 };
 use analysis_plans::{
     HarmonicConfirmEvaluator, HarmonicEvaluator, PlanEvaluator, PlanRuntimeState,
@@ -239,14 +239,19 @@ fn level(signal: &SignalDefinition, kind: &str) -> Decimal {
         .price
 }
 
+/// Bullish close at 990: past X (1000, the primary target), short of the PRZ.
+const PAST_X: i64 = 9_900;
+
 #[test]
-fn limit_plan_waits_in_the_prz_from_the_c_confirmation_bar() {
+fn limit_plan_arms_once_the_close_passes_x() {
     for direction in [Direction::Buy, Direction::Sell] {
+        let on_c_bar = snapshot(Timeframe::M15, direction, C_CONFIRMED, 10_800, None);
+        assert!(evaluate_limit(&on_c_bar).is_none(), "close above X waits");
         let signal = evaluate_limit(&snapshot(
             Timeframe::M15,
             direction,
-            C_CONFIRMED,
-            10_800,
+            C_CONFIRMED + 5 * BAR,
+            PAST_X,
             None,
         ))
         .expect("limit signal");
@@ -266,7 +271,8 @@ fn limit_plan_waits_in_the_prz_from_the_c_confirmation_bar() {
         assert_eq!(level(&signal, "PRZ_LOW"), low);
         assert_eq!(level(&signal, "PRZ_HIGH"), high);
         assert_eq!(level(&signal, "HARMONIC_C"), price(direction, 10_950));
-        // Target 0.382 and extension 0.618 of AD from D_xa 938.2 (AD 161.8).
+        // Target 0.382 and extension 0.618 of AD from D_xa 938.2 (AD 161.8):
+        // the target is X, already behind the close.
         assert_eq!(
             signal.primary_target,
             mirrored(direction, Decimal::new(10_000_076, 4))
@@ -285,19 +291,143 @@ fn limit_plan_waits_in_the_prz_from_the_c_confirmation_bar() {
 }
 
 #[test]
-fn limit_plan_is_silent_after_the_c_bar_inside_the_prz_and_off_the_agreed_timeframes() {
-    let later = snapshot(
+fn limit_plan_is_silent_inside_the_prz_after_the_arm_window_and_off_the_agreed_timeframes() {
+    let in_prz = snapshot(
         Timeframe::M15,
         Direction::Buy,
         C_CONFIRMED + BAR,
-        10_800,
+        9_390,
         None,
     );
-    assert!(evaluate_limit(&later).is_none());
-    let in_prz = snapshot(Timeframe::M15, Direction::Buy, C_CONFIRMED, 9_390, None);
     assert!(evaluate_limit(&in_prz).is_none());
-    let one_minute = snapshot(Timeframe::M1, Direction::Buy, C_CONFIRMED, 10_800, None);
+    let last_bar = snapshot(
+        Timeframe::M15,
+        Direction::Buy,
+        C_CONFIRMED + 40 * BAR,
+        PAST_X,
+        None,
+    );
+    assert!(evaluate_limit(&last_bar).is_some());
+    let too_late = snapshot(
+        Timeframe::M15,
+        Direction::Buy,
+        C_CONFIRMED + 41 * BAR,
+        PAST_X,
+        None,
+    );
+    assert!(evaluate_limit(&too_late).is_none());
+    let one_minute = snapshot(
+        Timeframe::M1,
+        Direction::Buy,
+        C_CONFIRMED + BAR,
+        PAST_X,
+        None,
+    );
     assert!(evaluate_limit(&one_minute).is_none());
+}
+
+#[test]
+fn limit_plan_signals_once_per_c_and_again_for_a_new_c() {
+    let profile = profile(PlanKind::Harmonic, Timeframe::M15);
+    let first = HarmonicEvaluator
+        .evaluate(
+            &profile,
+            &snapshot(
+                Timeframe::M15,
+                Direction::Buy,
+                C_CONFIRMED + BAR,
+                PAST_X,
+                None,
+            ),
+            &PlanRuntimeState::neutral(&profile),
+            &[],
+        )
+        .unwrap();
+    assert!(first.signal.is_some());
+    assert_eq!(
+        first.next_state.internal["harmonicSignalledC"],
+        json!(C_CONFIRMED)
+    );
+    // The signal ended (cancelled or expired): a fresh slot keeps only the memory.
+    let mut ended = PlanRuntimeState::neutral(&profile);
+    ended.internal = first.next_state.internal.clone();
+    let again = HarmonicEvaluator
+        .evaluate(
+            &profile,
+            &snapshot(
+                Timeframe::M15,
+                Direction::Buy,
+                C_CONFIRMED + 3 * BAR,
+                PAST_X,
+                None,
+            ),
+            &ended,
+            &[],
+        )
+        .unwrap();
+    assert!(again.signal.is_none());
+    assert_eq!(again.next_state.internal, ended.internal);
+
+    // A higher C (1096) replaces the old one in the zigzag and may signal.
+    let new_c_time = C_CONFIRMED + 4 * BAR;
+    let mut with_new_c = snapshot(
+        Timeframe::M15,
+        Direction::Buy,
+        C_CONFIRMED + 8 * BAR,
+        PAST_X,
+        None,
+    );
+    let new_c = swing(SwingKind::High, 8, new_c_time, Decimal::new(10_960, 1));
+    with_new_c.target.facts.push(fact(new_c.id.clone(), new_c));
+    let renewed = HarmonicEvaluator
+        .evaluate(&profile, &with_new_c, &ended, &[])
+        .unwrap();
+    let signal = renewed.signal.expect("signal for the new C");
+    assert_eq!(level(&signal, "HARMONIC_C"), Decimal::new(10_960, 1));
+    assert_eq!(
+        renewed.next_state.internal["harmonicSignalledC"],
+        json!(new_c_time)
+    );
+}
+
+#[test]
+fn remembered_c_survives_a_closed_trade() {
+    let profile = profile(PlanKind::Harmonic, Timeframe::M15);
+    let first = HarmonicEvaluator
+        .evaluate(
+            &profile,
+            &snapshot(
+                Timeframe::M15,
+                Direction::Buy,
+                C_CONFIRMED + BAR,
+                PAST_X,
+                None,
+            ),
+            &PlanRuntimeState::neutral(&profile),
+            &[],
+        )
+        .unwrap();
+    let mut closed = first.next_state.clone();
+    closed.trade_state = TradeState::Closed;
+    let after = HarmonicEvaluator
+        .evaluate(
+            &profile,
+            &snapshot(
+                Timeframe::M15,
+                Direction::Buy,
+                C_CONFIRMED + 2 * BAR,
+                PAST_X,
+                None,
+            ),
+            &closed,
+            &[],
+        )
+        .unwrap();
+    assert!(after.next_state.active_signal.is_none());
+    assert_eq!(
+        after.next_state.internal["harmonicSignalledC"],
+        json!(C_CONFIRMED)
+    );
 }
 
 #[test]
@@ -306,7 +436,13 @@ fn limit_entry_is_cancelled_beyond_c_and_expires_after_forty_bars() {
     let first = HarmonicEvaluator
         .evaluate(
             &profile,
-            &snapshot(Timeframe::M15, Direction::Buy, C_CONFIRMED, 10_800, None),
+            &snapshot(
+                Timeframe::M15,
+                Direction::Buy,
+                C_CONFIRMED + BAR,
+                PAST_X,
+                None,
+            ),
             &PlanRuntimeState::neutral(&profile),
             &[],
         )
@@ -318,7 +454,7 @@ fn limit_entry_is_cancelled_beyond_c_and_expires_after_forty_bars() {
             &snapshot(
                 Timeframe::M15,
                 Direction::Buy,
-                C_CONFIRMED + BAR,
+                C_CONFIRMED + 2 * BAR,
                 10_960,
                 None,
             ),
@@ -335,7 +471,7 @@ fn limit_entry_is_cancelled_beyond_c_and_expires_after_forty_bars() {
     let expired = HarmonicEvaluator
         .evaluate(
             &profile,
-            &snapshot(Timeframe::M15, Direction::Buy, expiry, 10_800, None),
+            &snapshot(Timeframe::M15, Direction::Buy, expiry, PAST_X, None),
             &first.next_state,
             &[],
         )
@@ -349,8 +485,8 @@ fn limit_entry_is_cancelled_beyond_c_and_expires_after_forty_bars() {
             &snapshot(
                 Timeframe::M15,
                 Direction::Buy,
-                C_CONFIRMED + BAR,
-                10_800,
+                C_CONFIRMED + 2 * BAR,
+                PAST_X,
                 None,
             ),
             &first.next_state,

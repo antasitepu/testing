@@ -228,8 +228,10 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
             | "squeeze-v1"
             | "VOLATILITY_SQUEEZE-runtime-v1"
             | "harmonic-crab-limit-v1"
+            | "harmonic-crab-limit-v2"
             | "harmonic-crab-confirm-v1"
             | "HARMONIC-runtime-v1"
+            | "HARMONIC-runtime-v2"
             | "HARMONIC_CONFIRM-runtime-v1"
     )
 }
