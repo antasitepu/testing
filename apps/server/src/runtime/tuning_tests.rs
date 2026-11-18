@@ -514,7 +514,7 @@ fn partial_close_runtime_profiles_use_isolated_versions() {
         (PlanKind::Rsi, "RSI-runtime-v4"),
         (PlanKind::Quasimodo, "QUASIMODO-runtime-v7"),
         (PlanKind::MeanReversion, "MEAN_REVERSION-runtime-v5"),
-        (PlanKind::TrendBreakout, "TREND_BREAKOUT-runtime-v4"),
+        (PlanKind::TrendBreakout, "TREND_BREAKOUT-runtime-v5"),
     ] {
         let profile = default_runtime_profile(release_id, symbol.clone(), plan, Timeframe::M1)
             .expect("runtime profile");

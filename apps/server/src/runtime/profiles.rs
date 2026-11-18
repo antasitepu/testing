@@ -598,7 +598,7 @@ fn runtime_position_management(
 fn runtime_algorithm_version(plan: PlanKind) -> String {
     match plan {
         PlanKind::Rsi => "RSI-runtime-v4".to_owned(),
-        PlanKind::TrendBreakout => "TREND_BREAKOUT-runtime-v4".to_owned(),
+        PlanKind::TrendBreakout => "TREND_BREAKOUT-runtime-v5".to_owned(),
         PlanKind::Quasimodo => "QUASIMODO-runtime-v7".to_owned(),
         PlanKind::Ict => "ICT-runtime-v8".to_owned(),
         PlanKind::Smc => "SMC-runtime-v5".to_owned(),

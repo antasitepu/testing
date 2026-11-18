@@ -211,6 +211,7 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
             | "mean-v5"
             | "trend-v3"
             | "trend-v4"
+            | "trend-v5"
             | "ICT-runtime-v3"
             | "ICT-runtime-v4"
             | "ICT-runtime-v5"
@@ -232,6 +233,7 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
             | "MEAN_REVERSION-runtime-v5"
             | "TREND_BREAKOUT-runtime-v3"
             | "TREND_BREAKOUT-runtime-v4"
+            | "TREND_BREAKOUT-runtime-v5"
             | "squeeze-v1"
             | "VOLATILITY_SQUEEZE-runtime-v1"
     )

@@ -60,7 +60,7 @@ impl PlanEvaluator for TrendBreakoutEvaluator {
     }
 
     fn algorithm_version(&self) -> &'static str {
-        "trend-v4"
+        "trend-v5"
     }
 
     fn evaluate(
@@ -70,80 +70,152 @@ impl PlanEvaluator for TrendBreakoutEvaluator {
         state: &PlanRuntimeState,
         feedback: &[PlanFeedback],
     ) -> Result<PlanEvaluation, PlanError> {
-        if profile.key.plan != PlanKind::TrendBreakout
-            || snapshot.target_timeframe != profile.key.target_timeframe
+        let lock = reentry_lock(&state.internal)?;
+        let mut evaluation = evaluate_inner(profile, snapshot, state, feedback, lock)?;
+        let mut next_lock = lock;
+        if let Some((_, donchian)) = latest_donchian(snapshot)?
+            && donchian.close >= donchian.lower
+            && donchian.close <= donchian.upper
         {
-            return Err(PlanError::SignalIdentityMismatch);
+            next_lock = None;
         }
-        let analysis_domain::PlanParameters::TrendBreakout(parameters) = &profile.parameters else {
-            return Err(PlanError::SignalIdentityMismatch);
-        };
-        let mut next_state = state.clone();
-        let mut internal = shared_trade_state_from_value(&next_state.internal)?;
-        for item in feedback {
-            apply_feedback(&mut next_state, item)?;
-            apply_shared_trade_feedback(&mut internal, &next_state, item)?;
+        if let Some(signal) = &evaluation.signal {
+            next_lock = Some(signal.direction);
         }
-        if next_state.trade_state == TradeState::Closed && next_state.active_signal.is_some() {
-            next_state.clear_terminal_trade();
-            next_state.internal = serde_json::Value::Null;
-            return Ok(empty_evaluation(next_state));
-        }
-        store_shared_trade_state(&mut next_state, &internal)?;
-        if snapshot.readiness != analysis_domain::Readiness::Ready {
-            next_state.readiness = snapshot.readiness;
-            return Ok(empty_evaluation(next_state));
-        }
-        if next_state.active_signal.is_some() {
-            return manage_active(
-                next_state,
-                profile,
-                snapshot,
-                parameters,
-                internal,
-                &profile.profit_protection,
-                &profile.position_management,
-            );
-        }
-        let Some(setup) = find_setup(snapshot, parameters)? else {
-            next_state.setup_state = SetupState::Watching;
-            return Ok(empty_evaluation(next_state));
-        };
-        let Some(signal) = build_signal(profile, snapshot, parameters, &setup)? else {
-            next_state.setup_state = SetupState::Watching;
-            return Ok(empty_evaluation(next_state));
-        };
-        if let CandidateDecision::Rejected(rejected) =
-            create_signal(&mut next_state, signal.clone())?
+        if let Some(reverse) = evaluation
+            .directives
+            .iter()
+            .find_map(|directive| directive.reverse_signal.as_ref())
         {
-            return Ok(PlanEvaluation {
-                next_state,
-                signal: None,
-                events: Vec::new(),
-                directives: Vec::new(),
-                rejected_candidates: vec![rejected],
-            });
+            next_lock = Some(reverse.direction);
         }
-        let event = SignalEvent {
-            event_id: deterministic_uuid(&[signal.signal_id.as_bytes(), b"ENTRY_AVAILABLE"]),
-            signal_id: signal.signal_id,
-            sequence: next_state.next_event_sequence,
-            kind: SignalEventKind::EntryAvailable,
-            effective_at: signal.effective_at,
-            recorded_at: signal.detected_at,
-            virtual_trade_id: None,
-            price: None,
-            reason: None,
-        };
-        append_event(&mut next_state, &event)?;
-        Ok(PlanEvaluation {
-            next_state,
-            signal: Some(signal),
-            events: vec![event],
-            directives: Vec::new(),
-            rejected_candidates: Vec::new(),
-        })
+        store_reentry_lock(&mut evaluation.next_state, next_lock)?;
+        Ok(evaluation)
     }
+}
+
+/// Spec *Re-entry*: after a signal, the same direction waits for a close back inside the
+/// Donchian channel. Kept beside the shared trade state, which overwrites `internal`.
+const REENTRY_LOCK_KEY: &str = "trendReentryLock";
+
+fn reentry_lock(internal: &serde_json::Value) -> Result<Option<Direction>, PlanError> {
+    internal
+        .get(REENTRY_LOCK_KEY)
+        .map(|value| {
+            serde_json::from_value(value.clone())
+                .map_err(|error| PlanError::Serialization(error.to_string()))
+        })
+        .transpose()
+}
+
+fn store_reentry_lock(
+    state: &mut PlanRuntimeState,
+    lock: Option<Direction>,
+) -> Result<(), PlanError> {
+    if state.internal.is_null() {
+        if lock.is_none() {
+            return Ok(());
+        }
+        state.internal = serde_json::Value::Object(serde_json::Map::new());
+    }
+    let Some(object) = state.internal.as_object_mut() else {
+        return Err(PlanError::Serialization(
+            "trend runtime state must be an object".to_owned(),
+        ));
+    };
+    match lock {
+        Some(direction) => {
+            let value = serde_json::to_value(direction)
+                .map_err(|error| PlanError::Serialization(error.to_string()))?;
+            object.insert(REENTRY_LOCK_KEY.to_owned(), value);
+        }
+        None => {
+            object.remove(REENTRY_LOCK_KEY);
+        }
+    }
+    Ok(())
+}
+
+fn evaluate_inner(
+    profile: &MaterializedProfile,
+    snapshot: &CanonicalMarketSnapshot,
+    state: &PlanRuntimeState,
+    feedback: &[PlanFeedback],
+    lock: Option<Direction>,
+) -> Result<PlanEvaluation, PlanError> {
+    if profile.key.plan != PlanKind::TrendBreakout
+        || snapshot.target_timeframe != profile.key.target_timeframe
+    {
+        return Err(PlanError::SignalIdentityMismatch);
+    }
+    let analysis_domain::PlanParameters::TrendBreakout(parameters) = &profile.parameters else {
+        return Err(PlanError::SignalIdentityMismatch);
+    };
+    let mut next_state = state.clone();
+    let mut internal = shared_trade_state_from_value(&next_state.internal)?;
+    for item in feedback {
+        apply_feedback(&mut next_state, item)?;
+        apply_shared_trade_feedback(&mut internal, &next_state, item)?;
+    }
+    if next_state.trade_state == TradeState::Closed && next_state.active_signal.is_some() {
+        next_state.clear_terminal_trade();
+        next_state.internal = serde_json::Value::Null;
+        return Ok(empty_evaluation(next_state));
+    }
+    store_shared_trade_state(&mut next_state, &internal)?;
+    if snapshot.readiness != analysis_domain::Readiness::Ready {
+        next_state.readiness = snapshot.readiness;
+        return Ok(empty_evaluation(next_state));
+    }
+    if next_state.active_signal.is_some() {
+        return manage_active(
+            next_state,
+            profile,
+            snapshot,
+            parameters,
+            internal,
+            &profile.profit_protection,
+            &profile.position_management,
+        );
+    }
+    let Some(setup) =
+        find_setup(snapshot, parameters)?.filter(|setup| lock != Some(setup.direction))
+    else {
+        next_state.setup_state = SetupState::Watching;
+        return Ok(empty_evaluation(next_state));
+    };
+    let Some(signal) = build_signal(profile, snapshot, parameters, &setup)? else {
+        next_state.setup_state = SetupState::Watching;
+        return Ok(empty_evaluation(next_state));
+    };
+    if let CandidateDecision::Rejected(rejected) = create_signal(&mut next_state, signal.clone())? {
+        return Ok(PlanEvaluation {
+            next_state,
+            signal: None,
+            events: Vec::new(),
+            directives: Vec::new(),
+            rejected_candidates: vec![rejected],
+        });
+    }
+    let event = SignalEvent {
+        event_id: deterministic_uuid(&[signal.signal_id.as_bytes(), b"ENTRY_AVAILABLE"]),
+        signal_id: signal.signal_id,
+        sequence: next_state.next_event_sequence,
+        kind: SignalEventKind::EntryAvailable,
+        effective_at: signal.effective_at,
+        recorded_at: signal.detected_at,
+        virtual_trade_id: None,
+        price: None,
+        reason: None,
+    };
+    append_event(&mut next_state, &event)?;
+    Ok(PlanEvaluation {
+        next_state,
+        signal: Some(signal),
+        events: vec![event],
+        directives: Vec::new(),
+        rejected_candidates: Vec::new(),
+    })
 }
 
 fn latest_donchian(

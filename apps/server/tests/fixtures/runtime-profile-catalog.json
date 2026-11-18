@@ -1171,7 +1171,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "1m",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-1m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1215,7 +1215,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "5m",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-5m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1259,7 +1259,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "15m",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-15m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1303,7 +1303,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "30m",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-30m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1347,7 +1347,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "1h",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-1h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1391,7 +1391,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "4h",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-4h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1435,7 +1435,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "1d",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-1d-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
