@@ -20,6 +20,7 @@ use analysis_domain::{
     PlanFeedback, PlanKind, ReferenceLevel, SetupState, SignalDefinition, SignalEvent,
     SignalEventKind, TradeState,
 };
+use market_domain::Timeframe;
 use rust_decimal::Decimal;
 
 pub struct IctEvaluator;
@@ -131,8 +132,10 @@ impl PlanEvaluator for IctEvaluator {
     }
 }
 
-fn min_target_atr_distance() -> Decimal {
-    Decimal::new(5, 1)
+/// The distance is kept only where it passed its rule: 5m, 15m, 30m and 1h
+/// (run 44057244718). On 1m average R fell in train and validation.
+fn min_target_atr_distance(timeframe: Timeframe) -> Option<Decimal> {
+    (timeframe != Timeframe::M1).then(|| Decimal::new(5, 1))
 }
 
 fn find_setup(
@@ -216,18 +219,21 @@ fn find_setup(
     // A level price has already closed beyond is spent: the tracker cancels
     // the setup on the first price at or past its target. A level within half an
     // ATR of the close sits inside ordinary bar noise and is spent the same way.
-    let min_distance = atr * min_target_atr_distance();
+    let min_distance =
+        min_target_atr_distance(snapshot.target_timeframe).map(|fraction| atr * fraction);
+    let clears_close = |distance_beyond_close: Decimal| match min_distance {
+        Some(min_distance) => distance_beyond_close >= min_distance,
+        None => distance_beyond_close > Decimal::ZERO,
+    };
     let Some(target) = typed_facts::<LiquidityPool>(&snapshot.target.facts, FactKind::Liquidity)?
         .into_iter()
         .filter(|fact| {
             fact.side == target_side
                 && fact.lifecycle == FactLifecycle::Confirmed
                 && match direction {
-                    Direction::Buy => {
-                        fact.level > entry && fact.level >= latest_close + min_distance
-                    }
+                    Direction::Buy => fact.level > entry && clears_close(fact.level - latest_close),
                     Direction::Sell => {
-                        fact.level < entry && fact.level <= latest_close - min_distance
+                        fact.level < entry && clears_close(latest_close - fact.level)
                     }
                     Direction::None => false,
                 }

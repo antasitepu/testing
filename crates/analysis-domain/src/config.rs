@@ -235,6 +235,30 @@ pub struct VolatilitySqueezeParameters {
     pub max_bars_to_tp1: i32,
 }
 
+/// Harmonic patterns a `HarmonicParameters` set may detect.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum HarmonicPattern {
+    Crab,
+}
+
+/// Harmonic plans `HARMONIC` (limit entry in the PRZ) and `HARMONIC_CONFIRM`
+/// (next-open entry after D is confirmed), pre-registered in
+/// `docs/superpowers/specs/2026-11-18-harmonic-crab-plan-design.md`.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HarmonicParameters {
+    pub patterns: Vec<HarmonicPattern>,
+    pub ratio_tolerance: Decimal,
+    pub min_leg_atr: Decimal,
+    pub prz_half_width_atr: Decimal,
+    pub stop_buffer_atr: Decimal,
+    pub minimum_rr: Decimal,
+    pub minimum_entry_rr: Decimal,
+    pub max_bars_valid: i32,
+    pub atr_period: i32,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProfitProtectionParameters {
@@ -348,6 +372,8 @@ pub enum PlanParameters {
     MeanReversion(MeanReversionParameters),
     SessionBreakout(SessionBreakoutParameters),
     VolatilitySqueeze(VolatilitySqueezeParameters),
+    Harmonic(HarmonicParameters),
+    HarmonicConfirm(HarmonicParameters),
 }
 
 impl PlanParameters {
@@ -361,6 +387,8 @@ impl PlanParameters {
             Self::MeanReversion(_) => PlanKind::MeanReversion,
             Self::SessionBreakout(_) => PlanKind::SessionBreakout,
             Self::VolatilitySqueeze(_) => PlanKind::VolatilitySqueeze,
+            Self::Harmonic(_) => PlanKind::Harmonic,
+            Self::HarmonicConfirm(_) => PlanKind::HarmonicConfirm,
         }
     }
 
@@ -373,7 +401,9 @@ impl PlanParameters {
             | Self::Quasimodo(_)
             | Self::MeanReversion(_)
             | Self::SessionBreakout(_)
-            | Self::VolatilitySqueeze(_) => None,
+            | Self::VolatilitySqueeze(_)
+            | Self::Harmonic(_)
+            | Self::HarmonicConfirm(_) => None,
         }
     }
 
@@ -501,6 +531,25 @@ impl PlanParameters {
                     parameters.stop_buffer_atr,
                     parameters.target_rr,
                 ])
+            }
+            Self::Harmonic(parameters) | Self::HarmonicConfirm(parameters) => {
+                positive_periods(&[parameters.atr_period, parameters.max_bars_valid])?;
+                positive_decimals(&[
+                    parameters.min_leg_atr,
+                    parameters.prz_half_width_atr,
+                    parameters.stop_buffer_atr,
+                    parameters.minimum_rr,
+                    parameters.minimum_entry_rr,
+                ])?;
+                if parameters.ratio_tolerance <= Decimal::ZERO
+                    || parameters.ratio_tolerance >= Decimal::ONE
+                {
+                    return Err(PlanParameterError::InvalidFraction);
+                }
+                if parameters.patterns.is_empty() {
+                    return Err(PlanParameterError::InvalidRange);
+                }
+                Ok(())
             }
         }
     }

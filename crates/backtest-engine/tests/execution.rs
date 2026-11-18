@@ -548,3 +548,31 @@ fn session_breakout_next_open_cancels_through_stop_target_or_minimum_rr_at_zero_
         );
     }
 }
+
+#[test]
+fn harmonic_confirm_next_open_cancels_through_stop_target_or_minimum_rr_at_zero_spread() {
+    // Same cases as SESSION_BREAKOUT, so live and backtest share one rule.
+    let mut confirm = signal(
+        PlanKind::HarmonicConfirm,
+        ExecutionInstruction::NextOpen,
+        Direction::Buy,
+    );
+    confirm.pre_entry_validation = Some(PreEntryValidation {
+        minimum_rr: Decimal::ONE,
+        reject_if_target_crossed: true,
+        reject_if_stop_crossed: true,
+    });
+    for (open, expected) in [
+        (90, ExecutionKind::EntryCancelled),
+        (120, ExecutionKind::EntryCancelled),
+        (106, ExecutionKind::EntryCancelled),
+        (100, ExecutionKind::Entry),
+    ] {
+        let bar = candle(60_000, open, open + 1, open - 1, open);
+        assert_eq!(
+            OhlcConservativeExecution::new().on_signal(&confirm, &bar)[0].kind,
+            expected,
+            "open {open}"
+        );
+    }
+}

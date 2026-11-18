@@ -580,12 +580,31 @@ fn buy_side_pool(level: i64) -> ConfirmedFact<serde_json::Value> {
 }
 
 #[test]
-fn target_within_half_an_atr_of_latest_close_does_not_emit_signal() {
-    // Target 4200, ATR 10: the close must stay at least 5 short of the target.
-    let profile = profile(Uuid::now_v7());
-    let state = PlanRuntimeState::neutral(&profile);
+fn target_within_half_an_atr_of_latest_close_does_not_emit_signal_above_1m() {
+    // Target 4200, ATR 10: above 1m the close must stay at least 5 short of the target.
+    let one_minute = profile(Uuid::now_v7());
     let mut near = snapshot(false, 4_200, 59_999);
     close_at(&mut near, "4195.01");
+    let signal = IctEvaluator
+        .evaluate(
+            &one_minute,
+            &near,
+            &PlanRuntimeState::neutral(&one_minute),
+            &[],
+        )
+        .unwrap()
+        .signal
+        .unwrap();
+    assert_eq!(signal.primary_target, Decimal::new(4_200, 0));
+
+    let mut profile = profile(Uuid::now_v7());
+    profile.key.target_timeframe = Timeframe::M5;
+    let state = PlanRuntimeState::neutral(&profile);
+    let on_five_minutes = |mut snapshot: CanonicalMarketSnapshot| {
+        snapshot.target_timeframe = Timeframe::M5;
+        snapshot
+    };
+    let near = on_five_minutes(near);
     assert!(
         IctEvaluator
             .evaluate(&profile, &near, &state, &[])
@@ -595,6 +614,7 @@ fn target_within_half_an_atr_of_latest_close_does_not_emit_signal() {
     );
     let mut far_enough = snapshot(false, 4_200, 59_999);
     close_at(&mut far_enough, "4195");
+    let far_enough = on_five_minutes(far_enough);
     let signal = IctEvaluator
         .evaluate(&profile, &far_enough, &state, &[])
         .unwrap()

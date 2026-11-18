@@ -573,8 +573,8 @@ async fn runtime_bootstrap_creates_active_release_for_every_plan_and_work_hook()
         .fetch_one(&pool)
         .await
         .unwrap();
-    // Eight plans on seven timeframes; the two research plans are stored disabled.
-    assert_eq!(profiles, 56);
+    // Ten plans on seven timeframes; the four research plans are stored disabled.
+    assert_eq!(profiles, 70);
     let profile_contracts = sqlx::query(
         "SELECT plan, algorithm_version, parameter_version, position_management \
          FROM analysis_profiles ORDER BY plan, interval",
@@ -684,7 +684,7 @@ async fn runtime_bootstrap_replaces_incomplete_active_release() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(active_profiles, 56);
+    assert_eq!(active_profiles, 70);
     let retired: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM configuration_releases \
          WHERE release_id = $1 AND lifecycle = 'RETIRED'",

@@ -592,3 +592,27 @@ fn session_breakout_cancels_like_the_backtest() {
         }
     }
 }
+
+#[test]
+fn harmonic_confirm_cancels_like_the_backtest() {
+    // Same geometry as SESSION_BREAKOUT: stop 4090, target 4130, minimum RR 1.0.
+    let cases = [
+        (4_090, Some(PreEntryCancellation::StopCrossed)),
+        (4_130, Some(PreEntryCancellation::TargetCrossed)),
+        (4_112, Some(PreEntryCancellation::InsufficientRiskReward)),
+        (4_105, None),
+    ];
+    for (open, expected) in cases {
+        let pending = pending(PlanKind::HarmonicConfirm, 60_000, Vec::new());
+        let decision = pending.decide(&candle(60_000, open), Some(&regular_session()));
+        match expected {
+            Some(reason) => {
+                assert_eq!(decision, NextOpenDecision::Cancel { reason }, "open {open}")
+            }
+            None => assert!(
+                matches!(decision, NextOpenDecision::Enter { .. }),
+                "open {open}"
+            ),
+        }
+    }
+}

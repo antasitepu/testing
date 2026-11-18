@@ -2357,5 +2357,593 @@
     "requiredTimeframes": [],
     "minimumHistoryBars": 200,
     "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC",
+    "timeframe": "1m",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC-runtime-v1",
+    "parameterVersion": "HARMONIC-1m-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 40,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC",
+    "timeframe": "5m",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC-runtime-v1",
+    "parameterVersion": "HARMONIC-5m-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 40,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC",
+    "timeframe": "15m",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC-runtime-v1",
+    "parameterVersion": "HARMONIC-15m-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 40,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC",
+    "timeframe": "30m",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC-runtime-v1",
+    "parameterVersion": "HARMONIC-30m-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 40,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC",
+    "timeframe": "1h",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC-runtime-v1",
+    "parameterVersion": "HARMONIC-1h-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 40,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC",
+    "timeframe": "4h",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC-runtime-v1",
+    "parameterVersion": "HARMONIC-4h-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 40,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC",
+    "timeframe": "1d",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC-runtime-v1",
+    "parameterVersion": "HARMONIC-1d-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 40,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC_CONFIRM",
+    "timeframe": "1m",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC_CONFIRM-runtime-v1",
+    "parameterVersion": "HARMONIC_CONFIRM-1m-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC_CONFIRM",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 1,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC_CONFIRM",
+    "timeframe": "5m",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC_CONFIRM-runtime-v1",
+    "parameterVersion": "HARMONIC_CONFIRM-5m-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC_CONFIRM",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 1,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC_CONFIRM",
+    "timeframe": "15m",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC_CONFIRM-runtime-v1",
+    "parameterVersion": "HARMONIC_CONFIRM-15m-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC_CONFIRM",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 1,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC_CONFIRM",
+    "timeframe": "30m",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC_CONFIRM-runtime-v1",
+    "parameterVersion": "HARMONIC_CONFIRM-30m-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC_CONFIRM",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 1,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC_CONFIRM",
+    "timeframe": "1h",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC_CONFIRM-runtime-v1",
+    "parameterVersion": "HARMONIC_CONFIRM-1h-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC_CONFIRM",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 1,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC_CONFIRM",
+    "timeframe": "4h",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC_CONFIRM-runtime-v1",
+    "parameterVersion": "HARMONIC_CONFIRM-4h-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC_CONFIRM",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 1,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
+  },
+  {
+    "plan": "HARMONIC_CONFIRM",
+    "timeframe": "1d",
+    "enabled": false,
+    "algorithmVersion": "HARMONIC_CONFIRM-runtime-v1",
+    "parameterVersion": "HARMONIC_CONFIRM-1d-runtime-v1-pp1-pc1",
+    "parameters": {
+      "kind": "HARMONIC_CONFIRM",
+      "parameters": {
+        "atrPeriod": 14,
+        "maxBarsValid": 1,
+        "minLegAtr": "1",
+        "minimumEntryRr": "1",
+        "minimumRr": "1.5",
+        "patterns": [
+          "CRAB"
+        ],
+        "przHalfWidthAtr": "0.25",
+        "ratioTolerance": "0.05",
+        "stopBufferAtr": "0.25"
+      }
+    },
+    "profitProtection": {
+      "adverseCloses": 2,
+      "alignedActivationR": "1",
+      "counterActivationR": "0.5",
+      "lockStepR": "0.5",
+      "reversalGivebackR": "0.5"
+    },
+    "positionManagement": {
+      "minimumBufferTicks": 10,
+      "targetBufferAtrMultiplier": "0.1",
+      "targetBufferMinimumTicks": 5,
+      "tp1Fraction": "0.5",
+      "tp1R": "1",
+      "weakeningGivebackR": "0.25",
+      "zoneBufferMultiplier": "0.5"
+    },
+    "requiredTimeframes": [],
+    "minimumHistoryBars": 200,
+    "warmupBars": 50
   }
 ]

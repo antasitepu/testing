@@ -227,6 +227,10 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
             | "TREND_BREAKOUT-runtime-v4"
             | "squeeze-v1"
             | "VOLATILITY_SQUEEZE-runtime-v1"
+            | "harmonic-crab-limit-v1"
+            | "harmonic-crab-confirm-v1"
+            | "HARMONIC-runtime-v1"
+            | "HARMONIC_CONFIRM-runtime-v1"
     )
 }
 
@@ -1015,6 +1019,8 @@ fn management_reason_prefix(plan: PlanKind) -> &'static str {
         PlanKind::MeanReversion => "MEAN",
         PlanKind::SessionBreakout => "ORB",
         PlanKind::VolatilitySqueeze => "SQUEEZE",
+        PlanKind::Harmonic => "HARM",
+        PlanKind::HarmonicConfirm => "HARMC",
     }
 }
 
@@ -1317,6 +1323,8 @@ mod tests {
             management_reason_prefix(PlanKind::VolatilitySqueeze),
             "SQUEEZE"
         );
+        assert_eq!(management_reason_prefix(PlanKind::Harmonic), "HARM");
+        assert_eq!(management_reason_prefix(PlanKind::HarmonicConfirm), "HARMC");
     }
 
     #[test]
