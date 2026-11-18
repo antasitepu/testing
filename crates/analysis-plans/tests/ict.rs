@@ -807,3 +807,97 @@ fn runner_health_ict_thesis_close_emits_one_emergency_exit() {
     assert_eq!(managed.directives[0].kind, DirectiveKind::EmergencyExit);
     assert_eq!(managed.directives[0].reason, "ICT_THESIS_INVALIDATED");
 }
+
+const M1_BAR: i64 = 60_000;
+const M5_BAR: i64 = 300_000;
+
+/// Moves the confirmation time of every fact of `kind`, in the wrapper and in the value.
+fn confirm_at(facts: &mut [ConfirmedFact<serde_json::Value>], kind: FactKind, confirmed_at: i64) {
+    for fact in facts.iter_mut().filter(|fact| fact.id.kind == kind) {
+        fact.id.confirmed_at = confirmed_at;
+        fact.value["id"]["confirmedAt"] = json!(confirmed_at);
+    }
+}
+
+fn emits(snapshot: &CanonicalMarketSnapshot) -> bool {
+    let profile = profile(Uuid::now_v7());
+    let state = PlanRuntimeState::neutral(&profile);
+    IctEvaluator
+        .evaluate(&profile, snapshot, &state, &[])
+        .unwrap()
+        .signal
+        .is_some()
+}
+
+#[test]
+fn sweep_older_than_its_limit_does_not_emit_in_either_direction() {
+    // Sweep at 10_000, limit 10 target bars.
+    let edge = 10_000 + 10 * M1_BAR;
+    assert!(emits(&snapshot(false, 4_200, edge)));
+    assert!(!emits(&snapshot(false, 4_200, edge + 1)));
+    assert!(emits(&sell_snapshot(edge)));
+    assert!(!emits(&sell_snapshot(edge + 1)));
+}
+
+#[test]
+fn displacement_later_than_its_limit_after_the_sweep_does_not_emit() {
+    // Displacement at 20_000, limit 5 target bars after the sweep.
+    for (sweep_at, expected) in [
+        (20_000 - 5 * M1_BAR, true),
+        (20_000 - 5 * M1_BAR - 1, false),
+    ] {
+        let mut buy = snapshot(false, 4_200, 59_999);
+        confirm_at(&mut buy.target.facts, FactKind::LiquiditySweep, sweep_at);
+        assert_eq!(emits(&buy), expected, "buy, sweep at {sweep_at}");
+        let mut sell = sell_snapshot(59_999);
+        confirm_at(&mut sell.target.facts, FactKind::LiquiditySweep, sweep_at);
+        assert_eq!(emits(&sell), expected, "sell, sweep at {sweep_at}");
+    }
+}
+
+#[test]
+fn bias_older_than_its_limit_in_higher_timeframe_bars_does_not_emit() {
+    // Limit 20 bars of the 5m higher timeframe, not of the 1m target.
+    for (bias_at, expected) in [
+        (59_999 - 20 * M5_BAR, true),
+        (59_999 - 20 * M5_BAR - 1, false),
+    ] {
+        let mut buy = snapshot(false, 4_200, 59_999);
+        confirm_at(
+            &mut buy.higher_timeframes[0].facts,
+            FactKind::Structure,
+            bias_at,
+        );
+        assert_eq!(emits(&buy), expected, "buy, bias at {bias_at}");
+        let mut sell = sell_snapshot(59_999);
+        confirm_at(
+            &mut sell.higher_timeframes[0].facts,
+            FactKind::Structure,
+            bias_at,
+        );
+        assert_eq!(emits(&sell), expected, "sell, bias at {bias_at}");
+    }
+}
+
+#[test]
+fn without_higher_timeframe_bias_age_counts_target_bars() {
+    let mut profile = profile(Uuid::now_v7());
+    let PlanParameters::Ict(parameters) = &mut profile.parameters else {
+        panic!("expected ICT parameters");
+    };
+    parameters.higher_timeframe = None;
+    // Room for the sweep, so the bias limit (20 target bars) decides.
+    parameters.sweep_max_bars_valid = 100;
+    let state = PlanRuntimeState::neutral(&profile);
+    // The target structure at 30_000 sets the bias.
+    let edge = 30_000 + 20 * M1_BAR;
+    for (evaluated, expected) in [(edge, true), (edge + 1, false)] {
+        let mut snapshot = snapshot(false, 4_200, evaluated);
+        snapshot.higher_timeframes.clear();
+        let signal = IctEvaluator
+            .evaluate(&profile, &snapshot, &state, &[])
+            .unwrap()
+            .signal;
+        assert_eq!(signal.is_some(), expected, "evaluated {evaluated}");
+    }
+}

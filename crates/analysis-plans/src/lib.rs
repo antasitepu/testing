@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
 mod common;
-mod harmonic;
 mod ict;
 mod mean_reversion;
 mod quasimodo;
@@ -18,10 +17,6 @@ pub use common::{
     project_state,
 };
 pub use execution_domain::{PositionStage, TradeHealth};
-pub use harmonic::{
-    HarmonicConfirmEvaluator, HarmonicEvaluator, HarmonicGbEvaluator, harmonic_runs_on,
-    validate_harmonic_confirm_entry,
-};
 pub use ict::IctEvaluator;
 pub use mean_reversion::{
     MeanReversionEvaluator, PreEntryRejection, validate_mean_reversion_entry,

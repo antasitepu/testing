@@ -1,9 +1,7 @@
 use analysis_domain::{
     Direction, DirectiveKind, ExecutionInstruction, ManagementDirective, PlanKind, SignalDefinition,
 };
-use analysis_plans::{
-    validate_harmonic_confirm_entry, validate_mean_reversion_entry, validate_session_breakout_entry,
-};
+use analysis_plans::{validate_mean_reversion_entry, validate_session_breakout_entry};
 use execution_domain::{
     ExecutionKind as RangeExecutionKind, OhlcExecutionRange, PositionStage, classify_ohlc_ambiguity,
 };
@@ -232,9 +230,6 @@ impl ExecutionAdapter for OhlcConservativeExecution {
                     }
                     PlanKind::SessionBreakout => {
                         validate_session_breakout_entry(signal, next.open).is_err()
-                    }
-                    PlanKind::HarmonicConfirm => {
-                        validate_harmonic_confirm_entry(signal, next.open).is_err()
                     }
                     _ => false,
                 };

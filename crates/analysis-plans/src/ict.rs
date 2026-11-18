@@ -43,7 +43,7 @@ impl PlanEvaluator for IctEvaluator {
     }
 
     fn algorithm_version(&self) -> &'static str {
-        "ict-v4"
+        "ict-v5"
     }
 
     fn evaluate(
@@ -145,6 +145,7 @@ fn find_setup(
     let Some(direction) = bias_direction(snapshot, parameters)? else {
         return Ok(None);
     };
+    let target_bar = snapshot.target_timeframe.duration_ms();
     let Some(sweep) =
         typed_facts::<LiquiditySweep>(&snapshot.target.facts, FactKind::LiquiditySweep)?
             .into_iter()
@@ -155,6 +156,14 @@ fn find_setup(
     else {
         return Ok(None);
     };
+    if !within_bars(
+        sweep.id.confirmed_at,
+        snapshot.evaluated_closed_candle_time,
+        target_bar,
+        parameters.sweep_max_bars_valid,
+    ) {
+        return Ok(None);
+    }
     let Some(displacement) =
         typed_facts::<Displacement>(&snapshot.target.facts, FactKind::Displacement)?
             .into_iter()
@@ -165,6 +174,14 @@ fn find_setup(
     else {
         return Ok(None);
     };
+    if !within_bars(
+        sweep.id.confirmed_at,
+        displacement.id.confirmed_at,
+        target_bar,
+        parameters.displacement_max_bars_valid,
+    ) {
+        return Ok(None);
+    }
     let Some(structure) =
         typed_facts::<StructureEvent>(&snapshot.target.facts, FactKind::Structure)?
             .into_iter()
@@ -258,27 +275,38 @@ fn bias_direction(
     snapshot: &CanonicalMarketSnapshot,
     parameters: &IctParameters,
 ) -> Result<Option<Direction>, PlanError> {
-    if let Some(higher_timeframe) = parameters.higher_timeframe {
-        let Some(higher) = snapshot
-            .higher_timeframes
-            .iter()
-            .find(|facts| facts.timeframe == higher_timeframe)
-        else {
-            return Ok(None);
-        };
-        return Ok(
-            typed_facts::<StructureEvent>(&higher.facts, FactKind::Structure)?
-                .into_iter()
-                .max_by_key(|fact| fact.id.confirmed_at)
-                .map(|structure| structure.direction),
-        );
-    }
-    Ok(
-        typed_facts::<StructureEvent>(&snapshot.target.facts, FactKind::Structure)?
-            .into_iter()
-            .max_by_key(|fact| fact.id.confirmed_at)
-            .map(|structure| structure.direction),
-    )
+    let (timeframe, facts) = match parameters.higher_timeframe {
+        Some(higher_timeframe) => {
+            let Some(higher) = snapshot
+                .higher_timeframes
+                .iter()
+                .find(|facts| facts.timeframe == higher_timeframe)
+            else {
+                return Ok(None);
+            };
+            (higher_timeframe, &higher.facts)
+        }
+        None => (snapshot.target_timeframe, &snapshot.target.facts),
+    };
+    Ok(typed_facts::<StructureEvent>(facts, FactKind::Structure)?
+        .into_iter()
+        .max_by_key(|fact| fact.id.confirmed_at)
+        .filter(|structure| {
+            within_bars(
+                structure.id.confirmed_at,
+                snapshot.evaluated_closed_candle_time,
+                timeframe.duration_ms(),
+                parameters.bias_max_bars_valid,
+            )
+        })
+        .map(|structure| structure.direction))
+}
+
+/// `later` is at most `max_bars` bars of `bar_ms` after `earlier`.
+fn within_bars(earlier: i64, later: i64, bar_ms: i64, max_bars: i32) -> bool {
+    later
+        .checked_sub(earlier)
+        .is_some_and(|elapsed| elapsed <= bar_ms.saturating_mul(i64::from(max_bars)))
 }
 
 fn sweep_matches_bias(

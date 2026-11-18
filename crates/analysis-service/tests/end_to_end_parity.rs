@@ -1,9 +1,9 @@
 use analysis_domain::{
-    AnalysisWorkItem, CanonicalMarketSnapshot, HarmonicParameters, HarmonicPattern, HtfFilterMode,
-    IctParameters, MaterializedProfile, MeanReversionParameters, PlanKind, PlanParameters,
-    PlanProfileKey, QuasimodoParameters, Readiness, ReadinessReason, ReleaseMode,
-    RsiPlanParameters, SessionBreakoutParameters, SmcParameters, TrendBreakoutParameters,
-    VersionIdentity, VolatilitySqueezeParameters, WorkSource, WorkStatus,
+    AnalysisWorkItem, CanonicalMarketSnapshot, HtfFilterMode, IctParameters, MaterializedProfile,
+    MeanReversionParameters, PlanKind, PlanParameters, PlanProfileKey, QuasimodoParameters,
+    Readiness, ReadinessReason, ReleaseMode, RsiPlanParameters, SessionBreakoutParameters,
+    SmcParameters, TrendBreakoutParameters, VersionIdentity, VolatilitySqueezeParameters,
+    WorkSource, WorkStatus,
 };
 use analysis_plans::{
     IctEvaluator, MeanReversionEvaluator, PlanEvaluator, PlanRuntimeState, QuasimodoEvaluator,
@@ -127,27 +127,6 @@ fn parameters(plan: PlanKind) -> PlanParameters {
                 max_bars_to_tp1: 20,
             })
         }
-        PlanKind::Harmonic | PlanKind::HarmonicConfirm | PlanKind::HarmonicGb => {
-            let parameters = HarmonicParameters {
-                patterns: vec![HarmonicPattern::Crab],
-                ratio_tolerance: Decimal::new(5, 2),
-                min_leg_atr: Decimal::ONE,
-                prz_half_width_atr: Decimal::new(25, 2),
-                stop_buffer_atr: Decimal::new(25, 2),
-                minimum_rr: Decimal::new(15, 1),
-                minimum_entry_rr: Decimal::ONE,
-                max_bars_valid: 40,
-                atr_period: 14,
-            };
-            match plan {
-                PlanKind::Harmonic => PlanParameters::Harmonic(parameters),
-                PlanKind::HarmonicGb => PlanParameters::HarmonicGb(HarmonicParameters {
-                    patterns: vec![HarmonicPattern::Gartley, HarmonicPattern::Bat],
-                    ..parameters
-                }),
-                _ => PlanParameters::HarmonicConfirm(parameters),
-            }
-        }
     }
 }
 
@@ -161,9 +140,6 @@ fn evaluator(plan: PlanKind) -> Arc<dyn PlanEvaluator> {
         PlanKind::MeanReversion => Arc::new(MeanReversionEvaluator),
         PlanKind::SessionBreakout => Arc::new(SessionBreakoutEvaluator),
         PlanKind::VolatilitySqueeze => Arc::new(VolatilitySqueezeEvaluator),
-        PlanKind::Harmonic => Arc::new(analysis_plans::HarmonicEvaluator),
-        PlanKind::HarmonicConfirm => Arc::new(analysis_plans::HarmonicConfirmEvaluator),
-        PlanKind::HarmonicGb => Arc::new(analysis_plans::HarmonicGbEvaluator),
     }
 }
 

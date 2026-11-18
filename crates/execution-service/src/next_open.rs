@@ -1,7 +1,6 @@
 use analysis_domain::{PlanKind, SignalDefinition};
 use analysis_plans::{
-    PreEntryRejection, validate_harmonic_confirm_entry, validate_mean_reversion_entry,
-    validate_session_breakout_entry,
+    PreEntryRejection, validate_mean_reversion_entry, validate_session_breakout_entry,
 };
 use market_domain::{AggregateTrade, Candle, MarketSession, SessionStatus};
 use rust_decimal::Decimal;
@@ -41,9 +40,6 @@ impl PendingNextOpen {
             }
             PlanKind::SessionBreakout => {
                 Some(validate_session_breakout_entry(&self.signal, candle.open))
-            }
-            PlanKind::HarmonicConfirm => {
-                Some(validate_harmonic_confirm_entry(&self.signal, candle.open))
             }
             _ => None,
         };

@@ -54,7 +54,7 @@ fn profile(release_id: Uuid) -> MaterializedProfile {
 
 #[test]
 fn execution_plan_changes_all_evaluator_algorithm_versions() {
-    assert_eq!(IctEvaluator.algorithm_version(), "ict-v4");
+    assert_eq!(IctEvaluator.algorithm_version(), "ict-v5");
     assert_eq!(SmcEvaluator.algorithm_version(), "smc-v4");
     assert_eq!(QuasimodoEvaluator.algorithm_version(), "qm-v5");
     assert_eq!(MeanReversionEvaluator.algorithm_version(), "mean-v5");

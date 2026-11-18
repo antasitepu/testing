@@ -15,13 +15,10 @@ pub enum PlanKind {
     MeanReversion,
     SessionBreakout,
     VolatilitySqueeze,
-    Harmonic,
-    HarmonicConfirm,
-    HarmonicGb,
 }
 
 impl PlanKind {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 8] = [
         Self::Ict,
         Self::Smc,
         Self::Rsi,
@@ -30,9 +27,6 @@ impl PlanKind {
         Self::MeanReversion,
         Self::SessionBreakout,
         Self::VolatilitySqueeze,
-        Self::Harmonic,
-        Self::HarmonicConfirm,
-        Self::HarmonicGb,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -45,9 +39,6 @@ impl PlanKind {
             Self::MeanReversion => "MEAN_REVERSION",
             Self::SessionBreakout => "SESSION_BREAKOUT",
             Self::VolatilitySqueeze => "VOLATILITY_SQUEEZE",
-            Self::Harmonic => "HARMONIC",
-            Self::HarmonicConfirm => "HARMONIC_CONFIRM",
-            Self::HarmonicGb => "HARMONIC_GB",
         }
     }
 }

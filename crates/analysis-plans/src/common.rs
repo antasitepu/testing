@@ -197,6 +197,7 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
         algorithm_version,
         "ict-v3"
             | "ict-v4"
+            | "ict-v5"
             | "smc-v3"
             | "smc-v4"
             | "rsi-v4"
@@ -213,6 +214,7 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
             | "ICT-runtime-v4"
             | "ICT-runtime-v5"
             | "ICT-runtime-v6"
+            | "ICT-runtime-v7"
             | "SMC-runtime-v3"
             | "SMC-runtime-v4"
             | "RSI-runtime-v4"
@@ -227,14 +229,6 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
             | "TREND_BREAKOUT-runtime-v4"
             | "squeeze-v1"
             | "VOLATILITY_SQUEEZE-runtime-v1"
-            | "harmonic-crab-limit-v1"
-            | "harmonic-crab-limit-v2"
-            | "harmonic-crab-confirm-v1"
-            | "HARMONIC-runtime-v1"
-            | "HARMONIC-runtime-v2"
-            | "HARMONIC_CONFIRM-runtime-v1"
-            | "harmonic-gb-limit-v1"
-            | "HARMONIC_GB-runtime-v1"
     )
 }
 
@@ -1023,9 +1017,6 @@ fn management_reason_prefix(plan: PlanKind) -> &'static str {
         PlanKind::MeanReversion => "MEAN",
         PlanKind::SessionBreakout => "ORB",
         PlanKind::VolatilitySqueeze => "SQUEEZE",
-        PlanKind::Harmonic => "HARM",
-        PlanKind::HarmonicConfirm => "HARMC",
-        PlanKind::HarmonicGb => "HARMGB",
     }
 }
 
@@ -1328,9 +1319,6 @@ mod tests {
             management_reason_prefix(PlanKind::VolatilitySqueeze),
             "SQUEEZE"
         );
-        assert_eq!(management_reason_prefix(PlanKind::Harmonic), "HARM");
-        assert_eq!(management_reason_prefix(PlanKind::HarmonicConfirm), "HARMC");
-        assert_eq!(management_reason_prefix(PlanKind::HarmonicGb), "HARMGB");
     }
 
     #[test]

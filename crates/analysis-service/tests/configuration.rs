@@ -1,8 +1,7 @@
 use analysis_domain::{
-    HarmonicParameters, HarmonicPattern, HtfFilterMode, IctParameters, MeanReversionParameters,
-    PlanKind, PlanParameters, PlanProfileKey, QuasimodoParameters, ReleaseMode, RsiPlanParameters,
-    SessionBreakoutParameters, SmcParameters, TrendBreakoutParameters, VersionIdentity,
-    VolatilitySqueezeParameters,
+    HtfFilterMode, IctParameters, MeanReversionParameters, PlanKind, PlanParameters,
+    PlanProfileKey, QuasimodoParameters, ReleaseMode, RsiPlanParameters, SessionBreakoutParameters,
+    SmcParameters, TrendBreakoutParameters, VersionIdentity, VolatilitySqueezeParameters,
 };
 use analysis_service::{
     ConfigurationRelease, MaterializedProfile, ReleaseLifecycle, ValidationGate,
@@ -134,27 +133,6 @@ fn parameters(plan: PlanKind, timeframe: Timeframe) -> PlanParameters {
                 target_rr: Decimal::TWO,
                 max_bars_to_tp1: 20,
             })
-        }
-        PlanKind::Harmonic | PlanKind::HarmonicConfirm | PlanKind::HarmonicGb => {
-            let parameters = HarmonicParameters {
-                patterns: vec![HarmonicPattern::Crab],
-                ratio_tolerance: Decimal::new(5, 2),
-                min_leg_atr: Decimal::ONE,
-                prz_half_width_atr: Decimal::new(25, 2),
-                stop_buffer_atr: Decimal::new(25, 2),
-                minimum_rr: Decimal::new(15, 1),
-                minimum_entry_rr: Decimal::ONE,
-                max_bars_valid: 40,
-                atr_period: 14,
-            };
-            match plan {
-                PlanKind::Harmonic => PlanParameters::Harmonic(parameters),
-                PlanKind::HarmonicGb => PlanParameters::HarmonicGb(HarmonicParameters {
-                    patterns: vec![HarmonicPattern::Gartley, HarmonicPattern::Bat],
-                    ..parameters
-                }),
-                _ => PlanParameters::HarmonicConfirm(parameters),
-            }
         }
     }
 }

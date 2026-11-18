@@ -498,9 +498,6 @@ fn all_plans_have_stable_order() {
             PlanKind::MeanReversion,
             PlanKind::SessionBreakout,
             PlanKind::VolatilitySqueeze,
-            PlanKind::Harmonic,
-            PlanKind::HarmonicConfirm,
-            PlanKind::HarmonicGb,
         ]
     );
     assert_eq!(
@@ -514,9 +511,6 @@ fn all_plans_have_stable_order() {
             "MEAN_REVERSION",
             "SESSION_BREAKOUT",
             "VOLATILITY_SQUEEZE",
-            "HARMONIC",
-            "HARMONIC_CONFIRM",
-            "HARMONIC_GB",
         ]
     );
 }
