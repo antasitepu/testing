@@ -444,7 +444,7 @@ fn default_runtime_profiles_use_backtested_ict_rsi_qm_smc_parameters() {
     let release_id = uuid::Uuid::from_u128(1);
     let ict = default_runtime_profile(release_id, symbol.clone(), PlanKind::Ict, Timeframe::M1)
         .expect("ict profile");
-    assert_eq!(ict.versions.algorithm_version, "ICT-runtime-v7");
+    assert_eq!(ict.versions.algorithm_version, "ICT-runtime-v8");
     assert_eq!(ict.versions.parameter_version, "ICT-1m-runtime-v3-pp1-pc1");
     let PlanParameters::Ict(ict) = ict.parameters else {
         panic!("expected ICT parameters");
@@ -479,7 +479,7 @@ fn default_runtime_profiles_use_backtested_ict_rsi_qm_smc_parameters() {
         Timeframe::M1,
     )
     .expect("qm profile");
-    assert_eq!(qm.versions.algorithm_version, "QUASIMODO-runtime-v5");
+    assert_eq!(qm.versions.algorithm_version, "QUASIMODO-runtime-v7");
     assert_eq!(
         qm.versions.parameter_version,
         "QUASIMODO-1m-runtime-v2-pp1-pc1"
@@ -494,7 +494,7 @@ fn default_runtime_profiles_use_backtested_ict_rsi_qm_smc_parameters() {
 
     let smc = default_runtime_profile(release_id, symbol, PlanKind::Smc, Timeframe::M1)
         .expect("smc profile");
-    assert_eq!(smc.versions.algorithm_version, "SMC-runtime-v4");
+    assert_eq!(smc.versions.algorithm_version, "SMC-runtime-v5");
     assert_eq!(smc.versions.parameter_version, "SMC-1m-runtime-v2-pp1-pc1");
     let PlanParameters::Smc(smc) = smc.parameters else {
         panic!("expected SMC parameters");
@@ -509,12 +509,12 @@ fn partial_close_runtime_profiles_use_isolated_versions() {
     let symbol = Symbol::new("XAUUSDT").expect("symbol");
     let release_id = uuid::Uuid::from_u128(1);
     for (plan, expected_algorithm) in [
-        (PlanKind::Ict, "ICT-runtime-v7"),
-        (PlanKind::Smc, "SMC-runtime-v4"),
+        (PlanKind::Ict, "ICT-runtime-v8"),
+        (PlanKind::Smc, "SMC-runtime-v5"),
         (PlanKind::Rsi, "RSI-runtime-v4"),
-        (PlanKind::Quasimodo, "QUASIMODO-runtime-v5"),
+        (PlanKind::Quasimodo, "QUASIMODO-runtime-v7"),
         (PlanKind::MeanReversion, "MEAN_REVERSION-runtime-v5"),
-        (PlanKind::TrendBreakout, "TREND_BREAKOUT-runtime-v4"),
+        (PlanKind::TrendBreakout, "TREND_BREAKOUT-runtime-v5"),
     ] {
         let profile = default_runtime_profile(release_id, symbol.clone(), plan, Timeframe::M1)
             .expect("runtime profile");
@@ -3106,7 +3106,7 @@ fn build_ict_smc_tuning_facts(
     let timeframe = candles[0].timeframe;
     let price_version = primitive_version(timeframe, "price", "price-runtime-v1");
     let structure_version = primitive_version(timeframe, "structure", "structure-runtime-v1");
-    let liquidity_version = primitive_version(timeframe, "liquidity", "liquidity-runtime-v1");
+    let liquidity_version = primitive_version(timeframe, "liquidity", "liquidity-runtime-v2");
     let volatility_version = primitive_version(timeframe, "volatility", "volatility-runtime-v1");
     let last_index = candles.len().saturating_sub(1);
     push_value_fact(
@@ -3216,7 +3216,9 @@ fn build_ict_smc_tuning_facts(
         &liquidity_version.parameter_version,
     )?;
     for pool in &pools {
-        push_fact(&mut facts, pool.id.clone(), pool, pool.lifecycle)?;
+        let mut pool = pool.clone();
+        pool.lifecycle = analysis_core::pool_lifecycle(&pool, candles, Decimal::new(10, 2));
+        push_fact(&mut facts, pool.id.clone(), &pool, pool.lifecycle)?;
     }
     let sweeps = detect_liquidity_sweeps(
         &pools,
@@ -3311,7 +3313,7 @@ fn build_qm_tuning_facts(
     let timeframe = candles[0].timeframe;
     let price_version = primitive_version(timeframe, "price", "price-runtime-v1");
     let structure_version = primitive_version(timeframe, "structure", "structure-runtime-v1");
-    let liquidity_version = primitive_version(timeframe, "liquidity", "liquidity-runtime-v1");
+    let liquidity_version = primitive_version(timeframe, "liquidity", "liquidity-runtime-v2");
     let volatility_version = primitive_version(timeframe, "volatility", "volatility-runtime-v1");
     let last_index = candles.len().saturating_sub(1);
     push_value_fact(
@@ -3370,7 +3372,9 @@ fn build_qm_tuning_facts(
         &liquidity_version.parameter_version,
     )?;
     for pool in &pools {
-        push_fact(&mut facts, pool.id.clone(), pool, pool.lifecycle)?;
+        let mut pool = pool.clone();
+        pool.lifecycle = analysis_core::pool_lifecycle(&pool, candles, Decimal::new(10, 2));
+        push_fact(&mut facts, pool.id.clone(), &pool, pool.lifecycle)?;
     }
     Ok(facts)
 }

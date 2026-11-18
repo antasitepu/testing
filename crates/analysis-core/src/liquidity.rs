@@ -217,6 +217,27 @@ pub fn detect_liquidity_pools(
     Ok(pools)
 }
 
+/// `Swept` once a candle closing at or after the pool's confirmation trades beyond the
+/// pool by more than `tolerance`, the same reach `detect_liquidity_sweeps` requires.
+pub fn pool_lifecycle(
+    pool: &LiquidityPool,
+    candles: &[Candle],
+    tolerance: Decimal,
+) -> FactLifecycle {
+    let taken = candles
+        .iter()
+        .filter(|candle| candle.close_time >= pool.id.confirmed_at)
+        .any(|candle| match pool.side {
+            LiquiditySide::BuySide => candle.high > pool.upper_bound + tolerance,
+            LiquiditySide::SellSide => candle.low < pool.lower_bound - tolerance,
+        });
+    if taken {
+        FactLifecycle::Swept
+    } else {
+        FactLifecycle::Confirmed
+    }
+}
+
 pub fn detect_liquidity_sweeps(
     pools: &[LiquidityPool],
     candles: &[Candle],

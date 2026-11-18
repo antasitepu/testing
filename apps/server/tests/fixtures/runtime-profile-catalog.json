@@ -3,7 +3,7 @@
     "plan": "ICT",
     "timeframe": "1m",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v7",
+    "algorithmVersion": "ICT-runtime-v8",
     "parameterVersion": "ICT-1m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -46,7 +46,7 @@
     "plan": "ICT",
     "timeframe": "5m",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v7",
+    "algorithmVersion": "ICT-runtime-v8",
     "parameterVersion": "ICT-5m-runtime-v4-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -89,7 +89,7 @@
     "plan": "ICT",
     "timeframe": "15m",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v7",
+    "algorithmVersion": "ICT-runtime-v8",
     "parameterVersion": "ICT-15m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -132,7 +132,7 @@
     "plan": "ICT",
     "timeframe": "30m",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v7",
+    "algorithmVersion": "ICT-runtime-v8",
     "parameterVersion": "ICT-30m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -175,7 +175,7 @@
     "plan": "ICT",
     "timeframe": "1h",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v7",
+    "algorithmVersion": "ICT-runtime-v8",
     "parameterVersion": "ICT-1h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -218,7 +218,7 @@
     "plan": "ICT",
     "timeframe": "4h",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v7",
+    "algorithmVersion": "ICT-runtime-v8",
     "parameterVersion": "ICT-4h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -261,7 +261,7 @@
     "plan": "ICT",
     "timeframe": "1d",
     "enabled": true,
-    "algorithmVersion": "ICT-runtime-v7",
+    "algorithmVersion": "ICT-runtime-v8",
     "parameterVersion": "ICT-1d-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "ICT",
@@ -302,7 +302,7 @@
     "plan": "SMC",
     "timeframe": "1m",
     "enabled": true,
-    "algorithmVersion": "SMC-runtime-v4",
+    "algorithmVersion": "SMC-runtime-v5",
     "parameterVersion": "SMC-1m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "SMC",
@@ -342,7 +342,7 @@
     "plan": "SMC",
     "timeframe": "5m",
     "enabled": true,
-    "algorithmVersion": "SMC-runtime-v4",
+    "algorithmVersion": "SMC-runtime-v5",
     "parameterVersion": "SMC-5m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "SMC",
@@ -382,7 +382,7 @@
     "plan": "SMC",
     "timeframe": "15m",
     "enabled": true,
-    "algorithmVersion": "SMC-runtime-v4",
+    "algorithmVersion": "SMC-runtime-v5",
     "parameterVersion": "SMC-15m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "SMC",
@@ -422,7 +422,7 @@
     "plan": "SMC",
     "timeframe": "30m",
     "enabled": true,
-    "algorithmVersion": "SMC-runtime-v4",
+    "algorithmVersion": "SMC-runtime-v5",
     "parameterVersion": "SMC-30m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "SMC",
@@ -462,7 +462,7 @@
     "plan": "SMC",
     "timeframe": "1h",
     "enabled": true,
-    "algorithmVersion": "SMC-runtime-v4",
+    "algorithmVersion": "SMC-runtime-v5",
     "parameterVersion": "SMC-1h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "SMC",
@@ -502,7 +502,7 @@
     "plan": "SMC",
     "timeframe": "4h",
     "enabled": true,
-    "algorithmVersion": "SMC-runtime-v4",
+    "algorithmVersion": "SMC-runtime-v5",
     "parameterVersion": "SMC-4h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "SMC",
@@ -542,7 +542,7 @@
     "plan": "SMC",
     "timeframe": "1d",
     "enabled": true,
-    "algorithmVersion": "SMC-runtime-v4",
+    "algorithmVersion": "SMC-runtime-v5",
     "parameterVersion": "SMC-1d-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "SMC",
@@ -886,7 +886,7 @@
     "plan": "QUASIMODO",
     "timeframe": "1m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v5",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-1m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -927,7 +927,7 @@
     "plan": "QUASIMODO",
     "timeframe": "5m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v5",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-5m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -968,7 +968,7 @@
     "plan": "QUASIMODO",
     "timeframe": "15m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v5",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-15m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1009,7 +1009,7 @@
     "plan": "QUASIMODO",
     "timeframe": "30m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v5",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-30m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1050,7 +1050,7 @@
     "plan": "QUASIMODO",
     "timeframe": "1h",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v5",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-1h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1091,7 +1091,7 @@
     "plan": "QUASIMODO",
     "timeframe": "4h",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v5",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-4h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1132,7 +1132,7 @@
     "plan": "QUASIMODO",
     "timeframe": "1d",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v5",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-1d-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1171,7 +1171,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "1m",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-1m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1215,7 +1215,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "5m",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-5m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1259,7 +1259,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "15m",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-15m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1303,7 +1303,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "30m",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-30m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1347,7 +1347,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "1h",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-1h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1391,7 +1391,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "4h",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-4h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
@@ -1435,7 +1435,7 @@
     "plan": "TREND_BREAKOUT",
     "timeframe": "1d",
     "enabled": true,
-    "algorithmVersion": "TREND_BREAKOUT-runtime-v4",
+    "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
     "parameterVersion": "TREND_BREAKOUT-1d-runtime-v1-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",

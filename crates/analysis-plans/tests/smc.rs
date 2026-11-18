@@ -871,3 +871,19 @@ fn runner_health_smc_thesis_close_emits_one_emergency_exit() {
     assert_eq!(managed.directives[0].kind, DirectiveKind::EmergencyExit);
     assert_eq!(managed.directives[0].reason, "SMC_THESIS_INVALIDATED");
 }
+
+#[test]
+fn a_swept_pool_is_not_a_target() {
+    let mut snapshot = snapshot(false, Direction::Buy);
+    assert!(signal_for(&snapshot).is_some());
+    for fact in snapshot
+        .target
+        .facts
+        .iter_mut()
+        .filter(|fact| fact.id.kind == FactKind::Liquidity)
+    {
+        fact.lifecycle = FactLifecycle::Swept;
+        fact.value["lifecycle"] = serde_json::json!("SWEPT");
+    }
+    assert!(signal_for(&snapshot).is_none());
+}

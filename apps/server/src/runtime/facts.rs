@@ -236,7 +236,7 @@ fn primitive_versions(profile: &MaterializedProfile) -> Vec<PrimitiveVersion> {
             [
                 primitive_version(timeframe, "structure", "structure-runtime-v1"),
                 primitive_version(timeframe, "price", "price-runtime-v1"),
-                primitive_version(timeframe, "liquidity", "liquidity-runtime-v1"),
+                primitive_version(timeframe, "liquidity", "liquidity-runtime-v2"),
                 primitive_version(timeframe, "momentum", "momentum-runtime-v1"),
                 primitive_version(timeframe, "trend", "trend-runtime-v1"),
                 primitive_version(timeframe, "volatility", "volatility-runtime-v1"),
@@ -268,7 +268,7 @@ pub fn build_facts(
     let closes: Vec<_> = candles.iter().map(|candle| candle.close).collect();
     let price_version = primitive_version(timeframe, "price", "price-runtime-v1");
     let structure_version = primitive_version(timeframe, "structure", "structure-runtime-v1");
-    let liquidity_version = primitive_version(timeframe, "liquidity", "liquidity-runtime-v1");
+    let liquidity_version = primitive_version(timeframe, "liquidity", "liquidity-runtime-v2");
     let momentum_version = primitive_version(timeframe, "momentum", "momentum-runtime-v1");
     let trend_version = primitive_version(timeframe, "trend", "trend-runtime-v1");
     let volatility_version = primitive_version(timeframe, "volatility", "volatility-runtime-v1");
@@ -380,7 +380,9 @@ pub fn build_facts(
         &liquidity_version.parameter_version,
     )?;
     for pool in &pools {
-        push_fact(&mut facts, pool.id.clone(), pool, pool.lifecycle)?;
+        let mut pool = pool.clone();
+        pool.lifecycle = analysis_core::pool_lifecycle(&pool, candles, Decimal::new(10, 2));
+        push_fact(&mut facts, pool.id.clone(), &pool, pool.lifecycle)?;
     }
     let sweeps = detect_liquidity_sweeps(
         &pools,

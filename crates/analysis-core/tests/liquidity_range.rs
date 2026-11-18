@@ -1,7 +1,7 @@
 use analysis_core::{
     ConfirmedSwing, DealingRange, FairValueGapDirection, LiquiditySide, RangeRegion, SwingKind,
     build_dealing_range, detect_fair_value_gaps, detect_liquidity_pools, detect_liquidity_sweeps,
-    related_sequence,
+    pool_lifecycle, related_sequence,
 };
 use analysis_domain::{Direction, FactId, FactKind, FactLifecycle};
 use market_domain::{Candle, Symbol, Timeframe};
@@ -225,4 +225,74 @@ fn unrelated_displacement_sequence_is_rejected() {
         Some(&sweep_source),
         &displacement
     ));
+}
+
+fn bar(open_time: i64, open: i64, high: i64, low: i64, close: i64) -> Candle {
+    Candle::new(
+        symbol(),
+        Timeframe::M1,
+        open_time,
+        open_time + 59_999,
+        Decimal::new(open, 0),
+        Decimal::new(high, 0),
+        Decimal::new(low, 0),
+        Decimal::new(close, 0),
+    )
+    .unwrap()
+}
+
+#[test]
+fn pools_are_swept_once_price_trades_beyond_their_bound_plus_tolerance() {
+    // Buy-side pool 100..101 and sell-side pool 89..90, both confirmed at 120_000.
+    let swings = vec![
+        swing(SwingKind::High, 1, 100, 60_000),
+        swing(SwingKind::High, 2, 101, 180_000),
+        swing(SwingKind::Low, 3, 90, 240_000),
+        swing(SwingKind::Low, 4, 89, 360_000),
+    ];
+    let pools =
+        detect_liquidity_pools(&swings, Decimal::ONE, "liquidity-v1", "fixture-v1").unwrap();
+    let (buy, sell) = (&pools[0], &pools[1]);
+    assert_eq!(buy.side, LiquiditySide::BuySide);
+    assert_eq!(sell.side, LiquiditySide::SellSide);
+    let tolerance = Decimal::ONE;
+    let lifecycle = |pool, candles: &[Candle]| pool_lifecycle(pool, candles, tolerance);
+
+    assert_eq!(lifecycle(buy, &[]), FactLifecycle::Confirmed);
+    // Exactly the tolerance beyond the bound does not count.
+    assert_eq!(
+        lifecycle(buy, &[bar(420_000, 99, 102, 98, 99)]),
+        FactLifecycle::Confirmed
+    );
+    assert_eq!(
+        lifecycle(sell, &[bar(420_000, 91, 92, 88, 91)]),
+        FactLifecycle::Confirmed
+    );
+    // A wick beyond and back.
+    assert_eq!(
+        lifecycle(buy, &[bar(420_000, 99, 103, 98, 99)]),
+        FactLifecycle::Swept
+    );
+    assert_eq!(
+        lifecycle(sell, &[bar(420_000, 91, 92, 87, 91)]),
+        FactLifecycle::Swept
+    );
+    // A close beyond.
+    assert_eq!(
+        lifecycle(buy, &[bar(420_000, 100, 104, 99, 103)]),
+        FactLifecycle::Swept
+    );
+    assert_eq!(
+        lifecycle(sell, &[bar(420_000, 90, 91, 86, 87)]),
+        FactLifecycle::Swept
+    );
+    // A pass on a candle closing before the confirmation does not count.
+    assert_eq!(
+        lifecycle(buy, &[bar(0, 99, 110, 98, 99)]),
+        FactLifecycle::Confirmed
+    );
+    assert_eq!(
+        lifecycle(sell, &[bar(0, 91, 92, 80, 91)]),
+        FactLifecycle::Confirmed
+    );
 }

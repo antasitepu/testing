@@ -901,3 +901,26 @@ fn without_higher_timeframe_bias_age_counts_target_bars() {
         assert_eq!(signal.is_some(), expected, "evaluated {evaluated}");
     }
 }
+
+/// Marks every liquidity pool as taken, in the wrapper and in the value.
+fn sweep_pools(facts: &mut [ConfirmedFact<serde_json::Value>]) {
+    for fact in facts
+        .iter_mut()
+        .filter(|fact| fact.id.kind == FactKind::Liquidity)
+    {
+        fact.lifecycle = FactLifecycle::Swept;
+        fact.value["lifecycle"] = json!("SWEPT");
+    }
+}
+
+#[test]
+fn a_swept_pool_is_not_a_target() {
+    let mut buy = snapshot(false, 4_200, 59_999);
+    assert!(emits(&buy));
+    sweep_pools(&mut buy.target.facts);
+    assert!(!emits(&buy));
+    let mut sell = sell_snapshot(59_999);
+    assert!(emits(&sell));
+    sweep_pools(&mut sell.target.facts);
+    assert!(!emits(&sell));
+}

@@ -24,7 +24,7 @@ pub use indicators::{
 pub use liquidity::{
     FairValueGap, FairValueGapDirection, LiquidityError, LiquidityPool, LiquiditySide,
     LiquiditySweep, detect_fair_value_gaps, detect_liquidity_pools, detect_liquidity_sweeps,
-    fvg_lifecycle, related_sequence,
+    fvg_lifecycle, pool_lifecycle, related_sequence,
 };
 pub use range::{DealingRange, RangeError, RangeRegion, build_dealing_range};
 pub use session_range::{SessionRangeFact, SessionRangeParameters, detect_session_ranges};
