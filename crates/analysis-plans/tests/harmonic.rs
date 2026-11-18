@@ -6,8 +6,8 @@ use analysis_domain::{
     TimeframeFacts, TradeState, VersionIdentity,
 };
 use analysis_plans::{
-    HarmonicConfirmEvaluator, HarmonicEvaluator, PlanEvaluator, PlanRuntimeState,
-    PreEntryRejection, validate_harmonic_confirm_entry,
+    HarmonicConfirmEvaluator, HarmonicEvaluator, HarmonicGbEvaluator, PlanEvaluator,
+    PlanRuntimeState, PreEntryRejection, validate_harmonic_confirm_entry,
 };
 use market_domain::{Symbol, Timeframe};
 use rust_decimal::Decimal;
@@ -76,10 +76,13 @@ fn parameters(max_bars_valid: i32) -> HarmonicParameters {
 }
 
 fn profile(plan: PlanKind, timeframe: Timeframe) -> MaterializedProfile {
-    let parameters = if plan == PlanKind::Harmonic {
-        PlanParameters::Harmonic(parameters(40))
-    } else {
-        PlanParameters::HarmonicConfirm(parameters(1))
+    let parameters = match plan {
+        PlanKind::Harmonic => PlanParameters::Harmonic(parameters(40)),
+        PlanKind::HarmonicGb => PlanParameters::HarmonicGb(HarmonicParameters {
+            patterns: vec![HarmonicPattern::Gartley, HarmonicPattern::Bat],
+            ..parameters(40)
+        }),
+        _ => PlanParameters::HarmonicConfirm(parameters(1)),
     };
     MaterializedProfile {
         key: PlanProfileKey {
@@ -130,6 +133,9 @@ fn kind(direction: Direction, bullish: SwingKind) -> SwingKind {
     }
 }
 
+/// Bullish X, A, B, C in tenths for the Crab fixture.
+const CRAB: [i64; 4] = [10_000, 11_000, 10_500, 10_950];
+
 fn snapshot(
     timeframe: Timeframe,
     direction: Direction,
@@ -137,30 +143,41 @@ fn snapshot(
     close: i64,
     d: Option<i64>,
 ) -> CanonicalMarketSnapshot {
+    snapshot_with(timeframe, direction, evaluated, close, CRAB, d)
+}
+
+fn snapshot_with(
+    timeframe: Timeframe,
+    direction: Direction,
+    evaluated: i64,
+    close: i64,
+    pivots: [i64; 4],
+    d: Option<i64>,
+) -> CanonicalMarketSnapshot {
     let mut swings = vec![
         swing(
             kind(direction, SwingKind::Low),
             1,
             10 * BAR - 1,
-            price(direction, 10_000),
+            price(direction, pivots[0]),
         ),
         swing(
             kind(direction, SwingKind::High),
             2,
             20 * BAR - 1,
-            price(direction, 11_000),
+            price(direction, pivots[1]),
         ),
         swing(
             kind(direction, SwingKind::Low),
             3,
             30 * BAR - 1,
-            price(direction, 10_500),
+            price(direction, pivots[2]),
         ),
         swing(
             kind(direction, SwingKind::High),
             4,
             C_CONFIRMED,
-            price(direction, 10_950),
+            price(direction, pivots[3]),
         ),
     ];
     if let Some(d) = d {
@@ -580,4 +597,167 @@ fn signal_ids_are_deterministic_and_next_open_check_is_plan_specific() {
         validate_harmonic_confirm_entry(&other, Decimal::new(945, 0)),
         Err(PreEntryRejection::WrongPlan)
     );
+}
+
+/// Bullish Gartley (D_xa 1021.4, target 1051.4252) and Bat (D_xa 1011.4, target
+/// 1045.2452), PRZ +-2.5 with ATR 10.
+const GARTLEY: [i64; 4] = [10_000, 11_000, 10_380, 10_800];
+const BAT: [i64; 4] = [10_000, 11_000, 10_550, 10_900];
+
+fn evaluate_gb(snapshot: &CanonicalMarketSnapshot) -> Option<SignalDefinition> {
+    let profile = profile(PlanKind::HarmonicGb, snapshot.target_timeframe);
+    HarmonicGbEvaluator
+        .evaluate(
+            &profile,
+            snapshot,
+            &PlanRuntimeState::neutral(&profile),
+            &[],
+        )
+        .unwrap()
+        .signal
+}
+
+#[test]
+fn gartley_bat_plan_arms_once_the_close_passes_the_target() {
+    let cases = [
+        (GARTLEY, 10_600, 10_400, (10_189, 10_239), 10_514_252),
+        (BAT, 10_500, 10_300, (10_089, 10_139), 10_452_452),
+    ];
+    for (pivots, short_of_target, past_target, (prz_low, prz_high), target) in cases {
+        for direction in [Direction::Buy, Direction::Sell] {
+            let evaluated = C_CONFIRMED + 2 * BAR;
+            let waiting = snapshot_with(
+                Timeframe::M15,
+                direction,
+                evaluated,
+                short_of_target,
+                pivots,
+                None,
+            );
+            assert!(
+                evaluate_gb(&waiting).is_none(),
+                "close short of the target waits"
+            );
+            let signal = evaluate_gb(&snapshot_with(
+                Timeframe::M15,
+                direction,
+                evaluated,
+                past_target,
+                pivots,
+                None,
+            ))
+            .expect("gartley/bat signal");
+            assert_eq!(signal.plan, PlanKind::HarmonicGb);
+            assert_eq!(signal.direction, direction);
+            assert_eq!(
+                signal.execution_instruction,
+                ExecutionInstruction::LimitZone
+            );
+            let zone = signal.entry_zone.clone().expect("entry zone");
+            let (low, high) = if direction == Direction::Buy {
+                (price(direction, prz_low), price(direction, prz_high))
+            } else {
+                (price(direction, prz_high), price(direction, prz_low))
+            };
+            assert_eq!((zone.low, zone.high), (low, high));
+            assert_eq!(
+                signal.primary_target,
+                mirrored(direction, Decimal::new(target, 4))
+            );
+            assert_eq!(signal.validate_execution_geometry(), Ok(()));
+            assert!(signal.risk_reward >= Decimal::new(15, 1));
+        }
+    }
+}
+
+#[test]
+fn gartley_bat_plan_is_silent_in_the_prz_late_on_1m_and_on_a_crab_only_structure() {
+    let in_prz = snapshot_with(
+        Timeframe::M15,
+        Direction::Buy,
+        C_CONFIRMED + BAR,
+        10_220,
+        GARTLEY,
+        None,
+    );
+    assert!(evaluate_gb(&in_prz).is_none());
+    let too_late = snapshot_with(
+        Timeframe::M15,
+        Direction::Buy,
+        C_CONFIRMED + 41 * BAR,
+        10_400,
+        GARTLEY,
+        None,
+    );
+    assert!(evaluate_gb(&too_late).is_none());
+    let one_minute = snapshot_with(
+        Timeframe::M1,
+        Direction::Buy,
+        C_CONFIRMED + BAR,
+        10_400,
+        GARTLEY,
+        None,
+    );
+    assert!(evaluate_gb(&one_minute).is_none());
+    // AB/XA 0.55 is a Crab but neither a Gartley nor a Bat.
+    let crab_only = [10_000, 11_000, 10_450, 10_890];
+    let crab_signal = evaluate_limit(&snapshot_with(
+        Timeframe::M15,
+        Direction::Buy,
+        C_CONFIRMED + BAR,
+        9_900,
+        crab_only,
+        None,
+    ));
+    assert!(crab_signal.is_some());
+    for close in [9_900, 10_400] {
+        let snapshot = snapshot_with(
+            Timeframe::M15,
+            Direction::Buy,
+            C_CONFIRMED + BAR,
+            close,
+            crab_only,
+            None,
+        );
+        assert!(evaluate_gb(&snapshot).is_none());
+    }
+}
+
+#[test]
+fn gartley_bat_plan_signals_once_per_c() {
+    let profile = profile(PlanKind::HarmonicGb, Timeframe::M15);
+    let first = HarmonicGbEvaluator
+        .evaluate(
+            &profile,
+            &snapshot_with(
+                Timeframe::M15,
+                Direction::Buy,
+                C_CONFIRMED + BAR,
+                10_400,
+                GARTLEY,
+                None,
+            ),
+            &PlanRuntimeState::neutral(&profile),
+            &[],
+        )
+        .unwrap();
+    assert!(first.signal.is_some());
+    let mut ended = PlanRuntimeState::neutral(&profile);
+    ended.internal = first.next_state.internal.clone();
+    let again = HarmonicGbEvaluator
+        .evaluate(
+            &profile,
+            &snapshot_with(
+                Timeframe::M15,
+                Direction::Buy,
+                C_CONFIRMED + 3 * BAR,
+                10_400,
+                GARTLEY,
+                None,
+            ),
+            &ended,
+            &[],
+        )
+        .unwrap();
+    assert!(again.signal.is_none());
 }

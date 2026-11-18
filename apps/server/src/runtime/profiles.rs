@@ -6,9 +6,9 @@ use analysis_domain::{
     VersionIdentity, VolatilitySqueezeParameters,
 };
 use analysis_plans::{
-    HarmonicConfirmEvaluator, HarmonicEvaluator, IctEvaluator, MeanReversionEvaluator,
-    PlanEvaluator, QuasimodoEvaluator, RsiEvaluator, SessionBreakoutEvaluator, SmcEvaluator,
-    TrendBreakoutEvaluator, VolatilitySqueezeEvaluator,
+    HarmonicConfirmEvaluator, HarmonicEvaluator, HarmonicGbEvaluator, IctEvaluator,
+    MeanReversionEvaluator, PlanEvaluator, QuasimodoEvaluator, RsiEvaluator,
+    SessionBreakoutEvaluator, SmcEvaluator, TrendBreakoutEvaluator, VolatilitySqueezeEvaluator,
 };
 use analysis_service::{
     AnalysisServiceError, ConfigurationRelease, MaterializedProfile, PlanRegistry,
@@ -21,7 +21,7 @@ use serde_json::json;
 use std::{collections::BTreeSet, sync::Arc};
 use uuid::Uuid;
 
-const EXPECTED_PROFILE_COUNT: usize = 70;
+const EXPECTED_PROFILE_COUNT: usize = 77;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -230,6 +230,7 @@ pub(super) fn runtime_plan_registry() -> PlanRegistry {
         Arc::new(VolatilitySqueezeEvaluator),
         Arc::new(HarmonicEvaluator),
         Arc::new(HarmonicConfirmEvaluator),
+        Arc::new(HarmonicGbEvaluator),
     ];
     PlanRegistry::new(evaluators)
 }
@@ -536,6 +537,10 @@ pub(super) fn default_parameters(plan: PlanKind, timeframe: Timeframe) -> PlanPa
         }
         PlanKind::Harmonic => PlanParameters::Harmonic(harmonic_parameters(40)),
         PlanKind::HarmonicConfirm => PlanParameters::HarmonicConfirm(harmonic_parameters(1)),
+        PlanKind::HarmonicGb => PlanParameters::HarmonicGb(HarmonicParameters {
+            patterns: vec![HarmonicPattern::Gartley, HarmonicPattern::Bat],
+            ..harmonic_parameters(40)
+        }),
     }
 }
 
@@ -592,7 +597,10 @@ fn catalog_entry(plan: PlanKind, timeframe: Timeframe) -> RuntimeProfileCatalogE
         position_management: runtime_position_management(plan, timeframe),
         required_timeframes: if matches!(
             plan,
-            PlanKind::SessionBreakout | PlanKind::Harmonic | PlanKind::HarmonicConfirm
+            PlanKind::SessionBreakout
+                | PlanKind::Harmonic
+                | PlanKind::HarmonicConfirm
+                | PlanKind::HarmonicGb
         ) {
             Vec::new()
         } else {
@@ -612,6 +620,7 @@ const fn research_only(plan: PlanKind) -> bool {
             | PlanKind::VolatilitySqueeze
             | PlanKind::Harmonic
             | PlanKind::HarmonicConfirm
+            | PlanKind::HarmonicGb
     )
 }
 
@@ -634,6 +643,7 @@ fn runtime_algorithm_version(plan: PlanKind) -> String {
         PlanKind::VolatilitySqueeze => "VOLATILITY_SQUEEZE-runtime-v1".to_owned(),
         PlanKind::Harmonic => "HARMONIC-runtime-v2".to_owned(),
         PlanKind::HarmonicConfirm => "HARMONIC_CONFIRM-runtime-v1".to_owned(),
+        PlanKind::HarmonicGb => "HARMONIC_GB-runtime-v1".to_owned(),
     }
 }
 
@@ -692,7 +702,8 @@ fn runtime_parameter_version(plan: PlanKind, target_timeframe: Timeframe) -> Str
         | PlanKind::SessionBreakout
         | PlanKind::VolatilitySqueeze
         | PlanKind::Harmonic
-        | PlanKind::HarmonicConfirm => "v1",
+        | PlanKind::HarmonicConfirm
+        | PlanKind::HarmonicGb => "v1",
     };
     format!(
         "{}-{}-runtime-{version}-pp1-pc1",

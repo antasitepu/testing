@@ -154,6 +154,7 @@ fn parse_plan(value: &str) -> Result<PlanKind, AnalysisApiError> {
         "VOLATILITY_SQUEEZE" => Ok(PlanKind::VolatilitySqueeze),
         "HARMONIC" => Ok(PlanKind::Harmonic),
         "HARMONIC_CONFIRM" => Ok(PlanKind::HarmonicConfirm),
+        "HARMONIC_GB" => Ok(PlanKind::HarmonicGb),
         _ => Err(AnalysisApiError::invalid("unknown plan")),
     }
 }

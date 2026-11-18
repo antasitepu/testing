@@ -17,10 +17,11 @@ pub enum PlanKind {
     VolatilitySqueeze,
     Harmonic,
     HarmonicConfirm,
+    HarmonicGb,
 }
 
 impl PlanKind {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Ict,
         Self::Smc,
         Self::Rsi,
@@ -31,6 +32,7 @@ impl PlanKind {
         Self::VolatilitySqueeze,
         Self::Harmonic,
         Self::HarmonicConfirm,
+        Self::HarmonicGb,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -45,6 +47,7 @@ impl PlanKind {
             Self::VolatilitySqueeze => "VOLATILITY_SQUEEZE",
             Self::Harmonic => "HARMONIC",
             Self::HarmonicConfirm => "HARMONIC_CONFIRM",
+            Self::HarmonicGb => "HARMONIC_GB",
         }
     }
 }

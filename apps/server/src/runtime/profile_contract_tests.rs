@@ -87,6 +87,7 @@ fn research_plans_are_disabled_in_production() {
                 | PlanKind::VolatilitySqueeze
                 | PlanKind::Harmonic
                 | PlanKind::HarmonicConfirm
+                | PlanKind::HarmonicGb
         );
         assert_eq!(
             entry.enabled, !research,
@@ -95,7 +96,10 @@ fn research_plans_are_disabled_in_production() {
         );
         if matches!(
             entry.plan,
-            PlanKind::SessionBreakout | PlanKind::Harmonic | PlanKind::HarmonicConfirm
+            PlanKind::SessionBreakout
+                | PlanKind::Harmonic
+                | PlanKind::HarmonicConfirm
+                | PlanKind::HarmonicGb
         ) {
             assert!(entry.required_timeframes.is_empty());
         }
@@ -105,7 +109,7 @@ fn research_plans_are_disabled_in_production() {
 #[test]
 fn runtime_profile_catalog_contains_exactly_one_profile_per_plan_and_timeframe() {
     let catalog = RuntimeProfileCatalog::current().unwrap();
-    assert_eq!(catalog.entries().len(), 70);
+    assert_eq!(catalog.entries().len(), 77);
     catalog.validate().unwrap();
 }
 

@@ -233,6 +233,8 @@ fn requires_execution_plan(algorithm_version: &str) -> bool {
             | "HARMONIC-runtime-v1"
             | "HARMONIC-runtime-v2"
             | "HARMONIC_CONFIRM-runtime-v1"
+            | "harmonic-gb-limit-v1"
+            | "HARMONIC_GB-runtime-v1"
     )
 }
 
@@ -1023,6 +1025,7 @@ fn management_reason_prefix(plan: PlanKind) -> &'static str {
         PlanKind::VolatilitySqueeze => "SQUEEZE",
         PlanKind::Harmonic => "HARM",
         PlanKind::HarmonicConfirm => "HARMC",
+        PlanKind::HarmonicGb => "HARMGB",
     }
 }
 
@@ -1327,6 +1330,7 @@ mod tests {
         );
         assert_eq!(management_reason_prefix(PlanKind::Harmonic), "HARM");
         assert_eq!(management_reason_prefix(PlanKind::HarmonicConfirm), "HARMC");
+        assert_eq!(management_reason_prefix(PlanKind::HarmonicGb), "HARMGB");
     }
 
     #[test]

@@ -1,5 +1,7 @@
-//! Harmonic Crab plans: `HARMONIC` (`harmonic-crab-limit-v2`) and
-//! `HARMONIC_CONFIRM` (`harmonic-crab-confirm-v1`).
+//! Harmonic plans: `HARMONIC` (Crab, `harmonic-crab-limit-v2`),
+//! `HARMONIC_CONFIRM` (Crab, `harmonic-crab-confirm-v1`) and `HARMONIC_GB`
+//! (Gartley/Bat, `harmonic-gb-limit-v1`, spec
+//! `2026-11-18-harmonic-gartley-bat-plan-design.md`).
 //!
 //! Pre-registered in `docs/superpowers/specs/2026-11-18-harmonic-crab-plan-design.md`
 //! and `2026-11-18-harmonic-crab-limit-v2-design.md`: an ATR zigzag over the
@@ -38,11 +40,16 @@ const SIGNALLED_C_KEY: &str = "harmonicSignalledC";
 
 pub struct HarmonicEvaluator;
 pub struct HarmonicConfirmEvaluator;
+pub struct HarmonicGbEvaluator;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum EntryMode {
+    /// Crab limit (`HARMONIC`): arms once the close has passed X.
     Limit,
     Confirm,
+    /// Gartley/Bat limit (`HARMONIC_GB`): arms once the close has passed the
+    /// primary target.
+    LimitGb,
 }
 
 impl EntryMode {
@@ -50,7 +57,12 @@ impl EntryMode {
         match self {
             Self::Limit => PlanKind::Harmonic,
             Self::Confirm => PlanKind::HarmonicConfirm,
+            Self::LimitGb => PlanKind::HarmonicGb,
         }
+    }
+
+    const fn is_limit(self) -> bool {
+        matches!(self, Self::Limit | Self::LimitGb)
     }
 }
 
@@ -95,6 +107,26 @@ impl PlanEvaluator for HarmonicEvaluator {
     }
 }
 
+impl PlanEvaluator for HarmonicGbEvaluator {
+    fn kind(&self) -> PlanKind {
+        PlanKind::HarmonicGb
+    }
+
+    fn algorithm_version(&self) -> &'static str {
+        "harmonic-gb-limit-v1"
+    }
+
+    fn evaluate(
+        &self,
+        profile: &MaterializedProfile,
+        snapshot: &CanonicalMarketSnapshot,
+        state: &PlanRuntimeState,
+        feedback: &[PlanFeedback],
+    ) -> Result<PlanEvaluation, PlanError> {
+        evaluate(EntryMode::LimitGb, profile, snapshot, state, feedback)
+    }
+}
+
 impl PlanEvaluator for HarmonicConfirmEvaluator {
     fn kind(&self) -> PlanKind {
         PlanKind::HarmonicConfirm
@@ -116,7 +148,8 @@ impl PlanEvaluator for HarmonicConfirmEvaluator {
 }
 
 #[derive(Clone, Debug)]
-struct CrabPattern {
+struct PatternMatch {
+    pattern: HarmonicPattern,
     direction: Direction,
     x: ConfirmedSwing,
     a: ConfirmedSwing,
@@ -128,7 +161,7 @@ struct CrabPattern {
 }
 
 struct HarmonicSetup {
-    pattern: CrabPattern,
+    pattern: PatternMatch,
     d: Option<ConfirmedSwing>,
     atr: Decimal,
     atr_id: FactId,
@@ -187,7 +220,8 @@ fn evaluate_inner(
     }
     let parameters = match (&profile.parameters, mode) {
         (PlanParameters::Harmonic(parameters), EntryMode::Limit)
-        | (PlanParameters::HarmonicConfirm(parameters), EntryMode::Confirm) => parameters,
+        | (PlanParameters::HarmonicConfirm(parameters), EntryMode::Confirm)
+        | (PlanParameters::HarmonicGb(parameters), EntryMode::LimitGb) => parameters,
         _ => return Err(PlanError::SignalIdentityMismatch),
     };
     let mut next_state = state.clone();
@@ -217,9 +251,7 @@ fn evaluate_inner(
             &profile.position_management,
         );
     }
-    if !harmonic_runs_on(profile.key.target_timeframe)
-        || !parameters.patterns.contains(&HarmonicPattern::Crab)
-    {
+    if !harmonic_runs_on(profile.key.target_timeframe) || parameters.patterns.is_empty() {
         next_state.setup_state = SetupState::Watching;
         return Ok(empty_evaluation(next_state));
     }
@@ -252,7 +284,7 @@ fn evaluate_inner(
         reason: None,
     };
     append_event(&mut next_state, &event)?;
-    if mode == EntryMode::Limit {
+    if mode.is_limit() {
         remember_signalled_c(&mut next_state, setup.pattern.c.confirmed_at)?;
     }
     Ok(PlanEvaluation {
@@ -298,15 +330,64 @@ fn ratio(value: i64, scale: u32) -> Decimal {
     Decimal::new(value, scale)
 }
 
-/// Crab proportions on X-A-B-C (bullish: X low, A high, B low, C high).
-fn crab(
+/// Registered ratios: AB/XA and BC/AB ranges, the XA level of D
+/// (D_xa = A - level x XA, bullish) and the BC projection range of CD.
+struct Geometry {
+    ab_xa: (Decimal, Decimal),
+    bc_ab: (Decimal, Decimal),
+    d_level: Decimal,
+    cd_bc: (Decimal, Decimal),
+}
+
+fn geometry(pattern: HarmonicPattern) -> Geometry {
+    let bc_ab = (ratio(382, 3), ratio(886, 3));
+    match pattern {
+        HarmonicPattern::Crab => Geometry {
+            ab_xa: (ratio(382, 3), ratio(618, 3)),
+            bc_ab,
+            d_level: ratio(1618, 3),
+            cd_bc: (ratio(224, 2), ratio(3618, 3)),
+        },
+        HarmonicPattern::Gartley => Geometry {
+            ab_xa: (ratio(618, 3), ratio(618, 3)),
+            bc_ab,
+            d_level: ratio(786, 3),
+            cd_bc: (ratio(1272, 3), ratio(1618, 3)),
+        },
+        HarmonicPattern::Bat => Geometry {
+            ab_xa: (ratio(382, 3), ratio(500, 3)),
+            bc_ab,
+            d_level: ratio(886, 3),
+            cd_bc: (ratio(1618, 3), ratio(2618, 3)),
+        },
+    }
+}
+
+/// The first of `patterns` whose proportions X-A-B-C has.
+fn first_match(
+    patterns: &[HarmonicPattern],
     x: &ConfirmedSwing,
     a: &ConfirmedSwing,
     b: &ConfirmedSwing,
     c: &ConfirmedSwing,
     tolerance: Decimal,
     prz_half_width: Decimal,
-) -> Option<CrabPattern> {
+) -> Option<PatternMatch> {
+    patterns
+        .iter()
+        .find_map(|pattern| match_pattern(*pattern, x, a, b, c, tolerance, prz_half_width))
+}
+
+/// Pattern proportions on X-A-B-C (bullish: X low, A high, B low, C high).
+fn match_pattern(
+    pattern: HarmonicPattern,
+    x: &ConfirmedSwing,
+    a: &ConfirmedSwing,
+    b: &ConfirmedSwing,
+    c: &ConfirmedSwing,
+    tolerance: Decimal,
+    prz_half_width: Decimal,
+) -> Option<PatternMatch> {
     let direction = match (x.kind, a.kind, b.kind, c.kind) {
         (SwingKind::Low, SwingKind::High, SwingKind::Low, SwingKind::High) => Direction::Buy,
         (SwingKind::High, SwingKind::Low, SwingKind::High, SwingKind::Low) => Direction::Sell,
@@ -327,17 +408,19 @@ fn crab(
     let upper = Decimal::ONE + tolerance;
     let within =
         |value: Decimal, low: Decimal, high: Decimal| value >= low * lower && value <= high * upper;
-    if !within(ab / xa, ratio(382, 3), ratio(618, 3))
-        || !within(bc / ab, ratio(382, 3), ratio(886, 3))
+    let rules = geometry(pattern);
+    if !within(ab / xa, rules.ab_xa.0, rules.ab_xa.1)
+        || !within(bc / ab, rules.bc_ab.0, rules.bc_ab.1)
     {
         return None;
     }
-    let d_xa = a.price - sign * ratio(1618, 3) * xa;
+    let d_xa = a.price - sign * rules.d_level * xa;
     let cd = (c.price - d_xa) * sign;
-    if !within(cd, ratio(224, 2) * bc, ratio(3618, 3) * bc) {
+    if !within(cd, rules.cd_bc.0 * bc, rules.cd_bc.1 * bc) {
         return None;
     }
-    Some(CrabPattern {
+    Some(PatternMatch {
+        pattern,
         direction,
         x: x.clone(),
         a: a.clone(),
@@ -347,6 +430,16 @@ fn crab(
         prz_low: d_xa - prz_half_width,
         prz_high: d_xa + prz_half_width,
     })
+}
+
+/// D_ref + 0.382 x AD toward A.
+fn primary_target(direction: Direction, d_ref: Decimal, a: Decimal) -> Decimal {
+    let sign = if direction == Direction::Sell {
+        -Decimal::ONE
+    } else {
+        Decimal::ONE
+    };
+    d_ref + sign * ratio(382, 3) * (a - d_ref).abs()
 }
 
 fn find_setup(
@@ -383,7 +476,7 @@ fn find_setup(
     let evaluated = snapshot.evaluated_closed_candle_time;
     let prz_half_width = atr * parameters.prz_half_width_atr;
     let setup = match mode {
-        EntryMode::Limit => {
+        EntryMode::Limit | EntryMode::LimitGb => {
             let [.., x, a, b, c] = pivots.as_slice() else {
                 return Ok(None);
             };
@@ -400,14 +493,28 @@ fn find_setup(
             {
                 return Ok(None);
             }
-            let Some(pattern) = crab(x, a, b, c, parameters.ratio_tolerance, prz_half_width) else {
+            let Some(pattern) = first_match(
+                &parameters.patterns,
+                x,
+                a,
+                b,
+                c,
+                parameters.ratio_tolerance,
+                prz_half_width,
+            ) else {
                 return Ok(None);
             };
-            // v2: arm only once the close has passed X (the primary target) and
-            // is still short of the PRZ.
+            // Arm only once the close has passed the primary target and is
+            // still short of the PRZ. The Crab (v2) registered X as that level;
+            // its target D_xa + 0.382 x AD equals X up to the rounding of 1.618.
+            let arm_level = if pattern.pattern == HarmonicPattern::Crab {
+                x.price
+            } else {
+                primary_target(pattern.direction, pattern.d_xa, pattern.a.price)
+            };
             let armed = match pattern.direction {
-                Direction::Buy => latest_close <= x.price && latest_close > pattern.prz_high,
-                Direction::Sell => latest_close >= x.price && latest_close < pattern.prz_low,
+                Direction::Buy => latest_close <= arm_level && latest_close > pattern.prz_high,
+                Direction::Sell => latest_close >= arm_level && latest_close < pattern.prz_low,
                 Direction::None => false,
             };
             if !armed {
@@ -428,7 +535,15 @@ fn find_setup(
             if d.confirmed_at != evaluated {
                 return Ok(None);
             }
-            let Some(pattern) = crab(x, a, b, c, parameters.ratio_tolerance, prz_half_width) else {
+            let Some(pattern) = first_match(
+                &parameters.patterns,
+                x,
+                a,
+                b,
+                c,
+                parameters.ratio_tolerance,
+                prz_half_width,
+            ) else {
                 return Ok(None);
             };
             if d.price < pattern.prz_low || d.price > pattern.prz_high {
@@ -466,7 +581,7 @@ fn build_signal(
         pattern.prz_high
     };
     let (d_ref, thesis, entry_reference, zone_width) = match (mode, &setup.d) {
-        (EntryMode::Limit, _) => (
+        (EntryMode::Limit | EntryMode::LimitGb, _) => (
             pattern.d_xa,
             outer_edge,
             pattern.d_xa,
@@ -476,7 +591,7 @@ fn build_signal(
         (EntryMode::Confirm, None) => return Ok(None),
     };
     let leg = (pattern.a.price - d_ref).abs();
-    let target = d_ref + sign * ratio(382, 3) * leg;
+    let target = primary_target(direction, d_ref, pattern.a.price);
     let extension = d_ref + sign * ratio(618, 3) * leg;
     if (target - entry_reference) * sign <= Decimal::ZERO {
         return Ok(None);
@@ -557,7 +672,7 @@ fn build_signal(
         .collect();
     evidence_refs.push(evidence(&setup.atr_id, "ATR_BUFFER"));
     let (execution_instruction, entry_zone, projected_entry, pre_entry_validation) = match mode {
-        EntryMode::Limit => (
+        EntryMode::Limit | EntryMode::LimitGb => (
             ExecutionInstruction::LimitZone,
             Some(
                 PriceZone::new(pattern.prz_low, pattern.prz_high)
@@ -821,13 +936,31 @@ mod tests {
     #[test]
     fn bullish_and_bearish_crab_pass_with_prz_on_the_xa_extension() {
         let [x, a, b, c] = bull();
-        let pattern = crab(&x, &a, &b, &c, tolerance(), Decimal::ONE).expect("bull crab");
+        let pattern = match_pattern(
+            HarmonicPattern::Crab,
+            &x,
+            &a,
+            &b,
+            &c,
+            tolerance(),
+            Decimal::ONE,
+        )
+        .expect("bull crab");
         assert_eq!(pattern.direction, Direction::Buy);
         assert_eq!(pattern.d_xa, Decimal::new(9382, 1));
         assert_eq!(pattern.prz_low, Decimal::new(9372, 1));
         assert_eq!(pattern.prz_high, Decimal::new(9392, 1));
         let [x, a, b, c] = mirror(&bull());
-        let pattern = crab(&x, &a, &b, &c, tolerance(), Decimal::ONE).expect("bear crab");
+        let pattern = match_pattern(
+            HarmonicPattern::Crab,
+            &x,
+            &a,
+            &b,
+            &c,
+            tolerance(),
+            Decimal::ONE,
+        )
+        .expect("bear crab");
         assert_eq!(pattern.direction, Direction::Sell);
         assert_eq!(pattern.d_xa, Decimal::new(10618, 1));
     }
@@ -838,15 +971,48 @@ mod tests {
         // AB/XA = 0.65 > 0.618 * 1.05 = 0.6489.
         let b = swing(SwingKind::Low, 3, 30, 1035);
         let c = swing(SwingKind::High, 4, 40, 1070);
-        assert!(crab(&x, &a, &b, &c, tolerance(), Decimal::ONE).is_none());
+        assert!(
+            match_pattern(
+                HarmonicPattern::Crab,
+                &x,
+                &a,
+                &b,
+                &c,
+                tolerance(),
+                Decimal::ONE
+            )
+            .is_none()
+        );
         // AB/XA = 0.36 < 0.382 * 0.95 = 0.3629.
         let b = swing(SwingKind::Low, 3, 30, 1064);
         let c = swing(SwingKind::High, 4, 40, 1080);
-        assert!(crab(&x, &a, &b, &c, tolerance(), Decimal::ONE).is_none());
+        assert!(
+            match_pattern(
+                HarmonicPattern::Crab,
+                &x,
+                &a,
+                &b,
+                &c,
+                tolerance(),
+                Decimal::ONE
+            )
+            .is_none()
+        );
         // BC/AB = 0.94 > 0.886 * 1.05 = 0.9303.
         let b = swing(SwingKind::Low, 3, 30, 1050);
         let c = swing(SwingKind::High, 4, 40, 1097);
-        assert!(crab(&x, &a, &b, &c, tolerance(), Decimal::ONE).is_none());
+        assert!(
+            match_pattern(
+                HarmonicPattern::Crab,
+                &x,
+                &a,
+                &b,
+                &c,
+                tolerance(),
+                Decimal::ONE
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -854,13 +1020,104 @@ mod tests {
         let [x, a, b, _] = bull();
         // BC 35 (BC/AB 0.7): CD 146.8 = 4.19 x BC > 3.618 x 1.05.
         let c = swing(SwingKind::High, 4, 40, 1085);
-        assert!(crab(&x, &a, &b, &c, tolerance(), Decimal::ONE).is_none());
+        assert!(
+            match_pattern(
+                HarmonicPattern::Crab,
+                &x,
+                &a,
+                &b,
+                &c,
+                tolerance(),
+                Decimal::ONE
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn wrong_alternation_fails() {
         let [x, a, b, c] = bull();
-        assert!(crab(&a, &x, &b, &c, tolerance(), Decimal::ONE).is_none());
+        assert!(
+            match_pattern(
+                HarmonicPattern::Crab,
+                &a,
+                &x,
+                &b,
+                &c,
+                tolerance(),
+                Decimal::ONE
+            )
+            .is_none()
+        );
+    }
+
+    fn pivots(prices: [i64; 4]) -> [ConfirmedSwing; 4] {
+        [
+            swing(SwingKind::Low, 1, 10, prices[0]),
+            swing(SwingKind::High, 2, 20, prices[1]),
+            swing(SwingKind::Low, 3, 30, prices[2]),
+            swing(SwingKind::High, 4, 40, prices[3]),
+        ]
+    }
+
+    fn matches(pattern: HarmonicPattern, swings: &[ConfirmedSwing; 4]) -> Option<PatternMatch> {
+        let [x, a, b, c] = swings;
+        match_pattern(pattern, x, a, b, c, tolerance(), Decimal::ONE)
+    }
+
+    #[test]
+    fn gartley_and_bat_pass_with_d_on_their_xa_retracement() {
+        // Gartley: AB/XA 0.618, BC/AB 0.676, CD 58.6 = 1.402 x BC.
+        let gartley = pivots([1000, 1100, 1038, 1080]);
+        let found = matches(HarmonicPattern::Gartley, &gartley).expect("bull gartley");
+        assert_eq!(found.direction, Direction::Buy);
+        assert_eq!(found.d_xa, Decimal::new(10214, 1));
+        let found = matches(HarmonicPattern::Gartley, &mirror(&gartley)).expect("bear gartley");
+        assert_eq!(found.direction, Direction::Sell);
+        assert_eq!(found.d_xa, Decimal::new(9786, 1));
+        // Bat: AB/XA 0.45, BC/AB 0.778, CD 78.6 = 2.246 x BC.
+        let bat = pivots([1000, 1100, 1055, 1090]);
+        let found = matches(HarmonicPattern::Bat, &bat).expect("bull bat");
+        assert_eq!(found.d_xa, Decimal::new(10114, 1));
+        assert!(matches(HarmonicPattern::Bat, &mirror(&bat)).is_some());
+        // The AB/XA ranges are disjoint: neither is the other.
+        assert!(matches(HarmonicPattern::Bat, &gartley).is_none());
+        assert!(matches(HarmonicPattern::Gartley, &bat).is_none());
+    }
+
+    #[test]
+    fn gartley_and_bat_bounds_fail_just_outside_tolerance() {
+        // Gartley AB/XA 0.58 < 0.618 x 0.95 = 0.5871 (and > Bat 0.525).
+        assert!(matches(HarmonicPattern::Gartley, &pivots([1000, 1100, 1042, 1080])).is_none());
+        // Gartley AB/XA 0.65 > 0.6489.
+        assert!(matches(HarmonicPattern::Gartley, &pivots([1000, 1100, 1035, 1080])).is_none());
+        // Gartley BC/AB 0.371 passes, CD 39.6 / BC 23 = 1.72 > 1.618 x 1.05 = 1.699.
+        assert!(matches(HarmonicPattern::Gartley, &pivots([1000, 1100, 1038, 1061])).is_none());
+        // Bat AB/XA 0.53 > 0.5 x 1.05 = 0.525.
+        assert!(matches(HarmonicPattern::Bat, &pivots([1000, 1100, 1047, 1090])).is_none());
+        // Bat AB/XA 0.36 < 0.382 x 0.95 = 0.3629.
+        assert!(matches(HarmonicPattern::Bat, &pivots([1000, 1100, 1064, 1095])).is_none());
+        // Bat BC/AB 0.4 passes, CD 64.6 / BC 16 = 4.04 > 2.618 x 1.05 = 2.749.
+        assert!(matches(HarmonicPattern::Bat, &pivots([1000, 1100, 1060, 1076])).is_none());
+    }
+
+    #[test]
+    fn a_crab_with_ab_xa_between_bat_and_gartley_matches_neither() {
+        // AB/XA 0.55: Crab only.
+        let crab_only = pivots([1000, 1100, 1045, 1089]);
+        assert!(matches(HarmonicPattern::Crab, &crab_only).is_some());
+        assert!(
+            first_match(
+                &[HarmonicPattern::Gartley, HarmonicPattern::Bat],
+                &crab_only[0],
+                &crab_only[1],
+                &crab_only[2],
+                &crab_only[3],
+                tolerance(),
+                Decimal::ONE,
+            )
+            .is_none()
+        );
     }
 
     #[test]

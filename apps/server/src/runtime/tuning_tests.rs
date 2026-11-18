@@ -2838,7 +2838,8 @@ fn build_tuning_facts_for_plan(
         PlanKind::SessionBreakout
         | PlanKind::VolatilitySqueeze
         | PlanKind::Harmonic
-        | PlanKind::HarmonicConfirm => build_facts(candles),
+        | PlanKind::HarmonicConfirm
+        | PlanKind::HarmonicGb => build_facts(candles),
     }
 }
 
@@ -3549,6 +3550,7 @@ fn runtime_replay_evaluator(plan: PlanKind) -> Box<dyn PlanEvaluator> {
         PlanKind::VolatilitySqueeze => Box::new(analysis_plans::VolatilitySqueezeEvaluator),
         PlanKind::Harmonic => Box::new(analysis_plans::HarmonicEvaluator),
         PlanKind::HarmonicConfirm => Box::new(analysis_plans::HarmonicConfirmEvaluator),
+        PlanKind::HarmonicGb => Box::new(analysis_plans::HarmonicGbEvaluator),
     }
 }
 
@@ -4216,7 +4218,8 @@ fn selected_tuning_candidate(
         PlanKind::SessionBreakout
         | PlanKind::VolatilitySqueeze
         | PlanKind::Harmonic
-        | PlanKind::HarmonicConfirm => Vec::new(),
+        | PlanKind::HarmonicConfirm
+        | PlanKind::HarmonicGb => Vec::new(),
     };
     candidates
         .into_iter()
@@ -4242,7 +4245,8 @@ fn all_tuning_candidates(plan: PlanKind, timeframe: Timeframe) -> Vec<Candidate>
         PlanKind::SessionBreakout
         | PlanKind::VolatilitySqueeze
         | PlanKind::Harmonic
-        | PlanKind::HarmonicConfirm => Vec::new(),
+        | PlanKind::HarmonicConfirm
+        | PlanKind::HarmonicGb => Vec::new(),
     }
 }
 

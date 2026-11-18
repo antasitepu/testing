@@ -127,7 +127,7 @@ fn parameters(plan: PlanKind) -> PlanParameters {
                 max_bars_to_tp1: 20,
             })
         }
-        PlanKind::Harmonic | PlanKind::HarmonicConfirm => {
+        PlanKind::Harmonic | PlanKind::HarmonicConfirm | PlanKind::HarmonicGb => {
             let parameters = HarmonicParameters {
                 patterns: vec![HarmonicPattern::Crab],
                 ratio_tolerance: Decimal::new(5, 2),
@@ -139,10 +139,13 @@ fn parameters(plan: PlanKind) -> PlanParameters {
                 max_bars_valid: 40,
                 atr_period: 14,
             };
-            if plan == PlanKind::Harmonic {
-                PlanParameters::Harmonic(parameters)
-            } else {
-                PlanParameters::HarmonicConfirm(parameters)
+            match plan {
+                PlanKind::Harmonic => PlanParameters::Harmonic(parameters),
+                PlanKind::HarmonicGb => PlanParameters::HarmonicGb(HarmonicParameters {
+                    patterns: vec![HarmonicPattern::Gartley, HarmonicPattern::Bat],
+                    ..parameters
+                }),
+                _ => PlanParameters::HarmonicConfirm(parameters),
             }
         }
     }
@@ -160,6 +163,7 @@ fn evaluator(plan: PlanKind) -> Arc<dyn PlanEvaluator> {
         PlanKind::VolatilitySqueeze => Arc::new(VolatilitySqueezeEvaluator),
         PlanKind::Harmonic => Arc::new(analysis_plans::HarmonicEvaluator),
         PlanKind::HarmonicConfirm => Arc::new(analysis_plans::HarmonicConfirmEvaluator),
+        PlanKind::HarmonicGb => Arc::new(analysis_plans::HarmonicGbEvaluator),
     }
 }
 

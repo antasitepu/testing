@@ -84,7 +84,7 @@ jobs:
           IFS=, read -ra plans <<<"$PLANS"
           for plan in "${plans[@]}"; do
             case "$plan" in
-              ICT | SMC | RSI | QUASIMODO | TREND_BREAKOUT | MEAN_REVERSION | SESSION_BREAKOUT | VOLATILITY_SQUEEZE | HARMONIC | HARMONIC_CONFIRM) ;;
+              ICT | SMC | RSI | QUASIMODO | TREND_BREAKOUT | MEAN_REVERSION | SESSION_BREAKOUT | VOLATILITY_SQUEEZE | HARMONIC | HARMONIC_CONFIRM | HARMONIC_GB) ;;
               # Research hypotheses run alone, on their one registered timeframe, with edge.
               GOLD_DAY_CYCLE | TSMOM_12M)
                 registered="15m"; [[ "$plan" == TSMOM_12M ]] && registered="1h"

@@ -19,7 +19,8 @@ pub use common::{
 };
 pub use execution_domain::{PositionStage, TradeHealth};
 pub use harmonic::{
-    HarmonicConfirmEvaluator, HarmonicEvaluator, harmonic_runs_on, validate_harmonic_confirm_entry,
+    HarmonicConfirmEvaluator, HarmonicEvaluator, HarmonicGbEvaluator, harmonic_runs_on,
+    validate_harmonic_confirm_entry,
 };
 pub use ict::IctEvaluator;
 pub use mean_reversion::{

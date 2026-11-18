@@ -240,11 +240,15 @@ pub struct VolatilitySqueezeParameters {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum HarmonicPattern {
     Crab,
+    Gartley,
+    Bat,
 }
 
 /// Harmonic plans `HARMONIC` (limit entry in the PRZ) and `HARMONIC_CONFIRM`
 /// (next-open entry after D is confirmed), pre-registered in
-/// `docs/superpowers/specs/2026-11-18-harmonic-crab-plan-design.md`.
+/// `docs/superpowers/specs/2026-11-18-harmonic-crab-plan-design.md`, and
+/// `HARMONIC_GB` (Gartley/Bat limit entry,
+/// `2026-11-18-harmonic-gartley-bat-plan-design.md`).
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HarmonicParameters {
@@ -374,6 +378,7 @@ pub enum PlanParameters {
     VolatilitySqueeze(VolatilitySqueezeParameters),
     Harmonic(HarmonicParameters),
     HarmonicConfirm(HarmonicParameters),
+    HarmonicGb(HarmonicParameters),
 }
 
 impl PlanParameters {
@@ -389,6 +394,7 @@ impl PlanParameters {
             Self::VolatilitySqueeze(_) => PlanKind::VolatilitySqueeze,
             Self::Harmonic(_) => PlanKind::Harmonic,
             Self::HarmonicConfirm(_) => PlanKind::HarmonicConfirm,
+            Self::HarmonicGb(_) => PlanKind::HarmonicGb,
         }
     }
 
@@ -403,7 +409,8 @@ impl PlanParameters {
             | Self::SessionBreakout(_)
             | Self::VolatilitySqueeze(_)
             | Self::Harmonic(_)
-            | Self::HarmonicConfirm(_) => None,
+            | Self::HarmonicConfirm(_)
+            | Self::HarmonicGb(_) => None,
         }
     }
 
@@ -532,7 +539,9 @@ impl PlanParameters {
                     parameters.target_rr,
                 ])
             }
-            Self::Harmonic(parameters) | Self::HarmonicConfirm(parameters) => {
+            Self::Harmonic(parameters)
+            | Self::HarmonicConfirm(parameters)
+            | Self::HarmonicGb(parameters) => {
                 positive_periods(&[parameters.atr_period, parameters.max_bars_valid])?;
                 positive_decimals(&[
                     parameters.min_leg_atr,
