@@ -48,7 +48,7 @@ impl PlanEvaluator for QuasimodoEvaluator {
     }
 
     fn algorithm_version(&self) -> &'static str {
-        "qm-v6"
+        "qm-v5"
     }
 
     fn evaluate(
@@ -178,10 +178,7 @@ fn find_setup(
         else {
             continue;
         };
-        // Classic order: the broken swing formed between shoulder and head, so the
-        // break makes a lower low (bearish) or higher high (bullish).
-        if neckline.pivot_open_time <= shoulder.pivot_open_time
-            || neckline.pivot_open_time >= head.pivot_open_time
+        if neckline.confirmed_at <= shoulder.confirmed_at
             || neckline.confirmed_at >= structure_break.id.confirmed_at
         {
             continue;
@@ -279,10 +276,11 @@ fn select_target(
     } else {
         FactKind::SwingHigh
     };
-    let mut candidates: Vec<_> = untaken_swings(snapshot, target_swing_kind)?
-        .into_iter()
-        .map(|swing| (swing.id, swing.price))
-        .collect();
+    let mut candidates: Vec<_> =
+        typed_facts::<ConfirmedSwing>(&snapshot.target.facts, target_swing_kind)?
+            .into_iter()
+            .map(|swing| (swing.id, swing.price))
+            .collect();
     let target_side = if direction == Direction::Sell {
         LiquiditySide::SellSide
     } else {
@@ -308,23 +306,6 @@ fn select_target(
         })
         .min_by_key(|(_, level)| (*level - entry).abs())
         .map_or(Ok(None), |candidate| Ok(Some(candidate)))
-}
-
-/// Swings of `kind` that no structure event has broken: a broken swing has no
-/// liquidity left to target.
-fn untaken_swings(
-    snapshot: &CanonicalMarketSnapshot,
-    kind: FactKind,
-) -> Result<Vec<ConfirmedSwing>, PlanError> {
-    let broken: Vec<FactId> =
-        typed_facts::<StructureEvent>(&snapshot.target.facts, FactKind::Structure)?
-            .into_iter()
-            .map(|event| event.broken_swing_id)
-            .collect();
-    Ok(typed_facts::<ConfirmedSwing>(&snapshot.target.facts, kind)?
-        .into_iter()
-        .filter(|swing| !broken.contains(&swing.id))
-        .collect())
 }
 
 fn build_signal(
@@ -386,10 +367,11 @@ fn build_signal(
     } else {
         FactKind::SwingLow
     };
-    let mut extension_candidates: Vec<_> = untaken_swings(snapshot, target_swing_kind)?
-        .into_iter()
-        .map(|swing| swing.price)
-        .collect();
+    let mut extension_candidates: Vec<_> =
+        typed_facts::<ConfirmedSwing>(&snapshot.target.facts, target_swing_kind)?
+            .into_iter()
+            .map(|swing| swing.price)
+            .collect();
     let target_side = if setup.direction == Direction::Buy {
         LiquiditySide::BuySide
     } else {

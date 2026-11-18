@@ -560,7 +560,7 @@ fn consume_armed_through(internal: &mut RsiInternal, confirmed_through: Option<i
 }
 
 fn rsi_observations(snapshot: &CanonicalMarketSnapshot) -> Result<Vec<RsiObservation>, PlanError> {
-    let mut observations = snapshot
+    snapshot
         .target
         .facts
         .iter()
@@ -574,11 +574,7 @@ fn rsi_observations(snapshot: &CanonicalMarketSnapshot) -> Result<Vec<RsiObserva
                 close: value.close,
             })
         })
-        .collect::<Result<Vec<_>, PlanError>>()?;
-    // The crossing is read from the last two observations, so order them explicitly
-    // instead of relying on the order facts were built in.
-    observations.sort_by_key(|observation| (observation.id.confirmed_at, observation.id.ordinal));
-    Ok(observations)
+        .collect()
 }
 
 fn v5_rsi_observations(
@@ -981,10 +977,10 @@ fn build_signal(
         setup.swing.price + buffer
     };
     let risk = (projected_entry - stop_loss).abs();
-    // A close exactly on the stop has no risk to size a target from: no signal, not an
-    // evaluation error.
     if risk <= Decimal::ZERO {
-        return Ok(None);
+        return Err(PlanError::Serialization(
+            "RSI projected risk must be positive".to_owned(),
+        ));
     }
     let primary_target = if setup.direction == Direction::Buy {
         projected_entry + risk * parameters.target_rr

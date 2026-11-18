@@ -587,10 +587,6 @@ fn opposite_close_breakout_reverses_only_when_all_filters_pass() {
         reversed.directives[0].reason,
         "TREND_VALID_OPPOSITE_BREAKOUT"
     );
-    assert_eq!(
-        reversed.next_state.internal["trendReentryLock"],
-        json!("SELL")
-    );
 
     let invalid = snapshot(Direction::Sell, Decimal::new(4_000, 0), Decimal::new(20, 0));
     let exited = TrendBreakoutEvaluator
@@ -666,21 +662,10 @@ fn closed_trade_feedback_releases_active_slot_immediately() {
     assert_eq!(released.next_state.direction, Direction::None);
     assert_eq!(released.next_state.trade_state, TradeState::Closed);
 
-    // Spec *Re-entry*: the same leg does not signal again while price stays outside.
     let breakout = snapshot(Direction::Buy, Decimal::new(4_100, 0), Decimal::new(30, 0));
-    let locked = TrendBreakoutEvaluator
-        .evaluate(&profile, &breakout, &released.next_state, &[])
-        .unwrap();
-    assert!(locked.signal.is_none());
-
-    let inside = snapshot(Direction::Buy, Decimal::new(4_050, 0), Decimal::new(30, 0));
-    let reset = TrendBreakoutEvaluator
-        .evaluate(&profile, &inside, &locked.next_state, &[])
-        .unwrap();
-    assert!(reset.signal.is_none());
     assert!(
         TrendBreakoutEvaluator
-            .evaluate(&profile, &breakout, &reset.next_state, &[])
+            .evaluate(&profile, &breakout, &released.next_state, &[])
             .unwrap()
             .signal
             .is_some()
@@ -755,68 +740,4 @@ fn donchian_fixture_is_previous_window_data() {
         source_end_time: 179_999,
     };
     assert!(source.source_end_time < 180_000);
-}
-
-fn locked_state(profile: &MaterializedProfile, direction: &str) -> PlanRuntimeState {
-    let mut state = PlanRuntimeState::neutral(profile);
-    state.internal = json!({ "trendReentryLock": direction });
-    state
-}
-
-#[test]
-fn a_locked_direction_waits_for_a_close_inside_the_channel() {
-    let profile = profile();
-    let buy = snapshot(Direction::Buy, Decimal::new(4_100, 0), Decimal::new(30, 0));
-    let sell = snapshot(Direction::Sell, Decimal::new(4_000, 0), Decimal::new(30, 0));
-    let inside = snapshot(Direction::Buy, Decimal::new(4_050, 0), Decimal::new(30, 0));
-    let evaluate = |input: &CanonicalMarketSnapshot, state: &PlanRuntimeState| {
-        TrendBreakoutEvaluator
-            .evaluate(&profile, input, state, &[])
-            .unwrap()
-    };
-
-    // A missed or expired entry leaves the lock, so the same breakout is not reused.
-    let locked = evaluate(&buy, &locked_state(&profile, "BUY"));
-    assert!(locked.signal.is_none());
-    assert_eq!(locked.next_state.internal["trendReentryLock"], json!("BUY"));
-
-    // The opposite direction is not blocked, and its signal takes the lock.
-    let opposite = evaluate(&sell, &locked_state(&profile, "BUY"));
-    assert_eq!(opposite.signal.unwrap().direction, Direction::Sell);
-    assert_eq!(
-        opposite.next_state.internal["trendReentryLock"],
-        json!("SELL")
-    );
-
-    // A close inside the channel releases the lock.
-    let reset = evaluate(&inside, &locked_state(&profile, "BUY"));
-    assert!(reset.next_state.internal.get("trendReentryLock").is_none());
-    assert_eq!(
-        evaluate(&buy, &reset.next_state).signal.unwrap().direction,
-        Direction::Buy
-    );
-}
-
-#[test]
-fn the_lock_survives_shared_trade_state_writes() {
-    let (profile, _, state, trade_id) = opened_fixture();
-    assert_eq!(state.internal["trendReentryLock"], json!("BUY"));
-    let signal_id = state.active_signal.as_ref().unwrap().signal_id;
-    let entered = [PlanFeedback::ActualEntry {
-        signal_id,
-        virtual_trade_id: trade_id,
-        time: 240_000,
-        price: Decimal::new(4_100, 0),
-    }];
-    let open = TrendBreakoutEvaluator
-        .evaluate(
-            &profile,
-            &snapshot(Direction::Buy, Decimal::new(4_110, 0), Decimal::new(30, 0)),
-            &state,
-            &entered,
-        )
-        .unwrap();
-    assert_eq!(open.next_state.trade_state, TradeState::Open);
-    assert_eq!(open.next_state.internal["trendReentryLock"], json!("BUY"));
-    assert!(open.next_state.internal.get("entryPrice").is_some());
 }

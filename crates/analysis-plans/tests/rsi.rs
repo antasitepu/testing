@@ -2662,39 +2662,3 @@ fn unentered_signal_expires_at_its_versioned_boundary() {
         .unwrap();
     assert_eq!(expired.directives[0].kind, DirectiveKind::ExpireEntry);
 }
-
-fn v4_signal(snapshot: &CanonicalMarketSnapshot) -> Option<SignalDefinition> {
-    let profile = profile(false);
-    RsiEvaluator
-        .evaluate(
-            &profile,
-            snapshot,
-            &PlanRuntimeState::neutral(&profile),
-            &[],
-        )
-        .unwrap()
-        .signal
-}
-
-#[test]
-fn rsi_crossing_does_not_depend_on_fact_order() {
-    let mut input = snapshot(Direction::Buy, false);
-    assert!(v4_signal(&input).is_some());
-    // The exit observation first, the extreme second.
-    input.target.facts.swap(0, 1);
-    assert_eq!(v4_signal(&input).unwrap().direction, Direction::Buy);
-}
-
-#[test]
-fn a_close_exactly_on_the_stop_is_no_signal_not_an_error() {
-    // ATR 10 x buffer 0.2 = 2, so a swing low at 4102 puts the stop on the 4100 close.
-    let mut input = snapshot(Direction::Buy, false);
-    let swing = input
-        .target
-        .facts
-        .iter_mut()
-        .find(|fact| fact.id.kind == FactKind::SwingLow)
-        .unwrap();
-    swing.value["price"] = json!("4102");
-    assert!(v4_signal(&input).is_none());
-}

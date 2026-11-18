@@ -591,10 +591,9 @@ async fn runtime_bootstrap_creates_active_release_for_every_plan_and_work_hook()
         let position_management: Value = row.get("position_management");
         let expected_algorithm = match plan.as_str() {
             "ICT" => format!("{plan}-runtime-v8"),
-            "QUASIMODO" => format!("{plan}-runtime-v7"),
+            "QUASIMODO" => format!("{plan}-runtime-v6"),
             "SMC" => format!("{plan}-runtime-v5"),
-            "RSI" => format!("{plan}-runtime-v4"),
-            "TREND_BREAKOUT" => format!("{plan}-runtime-v5"),
+            "RSI" | "TREND_BREAKOUT" => format!("{plan}-runtime-v4"),
             "MEAN_REVERSION" => format!("{plan}-runtime-v5"),
             _ => format!("{plan}-runtime-v1"),
         };
