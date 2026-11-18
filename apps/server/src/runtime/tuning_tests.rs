@@ -479,7 +479,7 @@ fn default_runtime_profiles_use_backtested_ict_rsi_qm_smc_parameters() {
         Timeframe::M1,
     )
     .expect("qm profile");
-    assert_eq!(qm.versions.algorithm_version, "QUASIMODO-runtime-v6");
+    assert_eq!(qm.versions.algorithm_version, "QUASIMODO-runtime-v7");
     assert_eq!(
         qm.versions.parameter_version,
         "QUASIMODO-1m-runtime-v2-pp1-pc1"
@@ -512,7 +512,7 @@ fn partial_close_runtime_profiles_use_isolated_versions() {
         (PlanKind::Ict, "ICT-runtime-v8"),
         (PlanKind::Smc, "SMC-runtime-v5"),
         (PlanKind::Rsi, "RSI-runtime-v4"),
-        (PlanKind::Quasimodo, "QUASIMODO-runtime-v6"),
+        (PlanKind::Quasimodo, "QUASIMODO-runtime-v7"),
         (PlanKind::MeanReversion, "MEAN_REVERSION-runtime-v5"),
         (PlanKind::TrendBreakout, "TREND_BREAKOUT-runtime-v4"),
     ] {

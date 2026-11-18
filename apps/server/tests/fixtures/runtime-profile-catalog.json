@@ -886,7 +886,7 @@
     "plan": "QUASIMODO",
     "timeframe": "1m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v6",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-1m-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -927,7 +927,7 @@
     "plan": "QUASIMODO",
     "timeframe": "5m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v6",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-5m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -968,7 +968,7 @@
     "plan": "QUASIMODO",
     "timeframe": "15m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v6",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-15m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1009,7 +1009,7 @@
     "plan": "QUASIMODO",
     "timeframe": "30m",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v6",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-30m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1050,7 +1050,7 @@
     "plan": "QUASIMODO",
     "timeframe": "1h",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v6",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-1h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1091,7 +1091,7 @@
     "plan": "QUASIMODO",
     "timeframe": "4h",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v6",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-4h-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
@@ -1132,7 +1132,7 @@
     "plan": "QUASIMODO",
     "timeframe": "1d",
     "enabled": true,
-    "algorithmVersion": "QUASIMODO-runtime-v6",
+    "algorithmVersion": "QUASIMODO-runtime-v7",
     "parameterVersion": "QUASIMODO-1d-runtime-v2-pp1-pc1",
     "parameters": {
       "kind": "QUASIMODO",
