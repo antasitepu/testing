@@ -460,7 +460,7 @@ pub(super) fn default_parameters(plan: PlanKind, timeframe: Timeframe) -> PlanPa
                 chandelier_period: 22,
                 chandelier_atr_multiplier: Decimal::new(3, 0),
                 // Spec 2026-11-19 Trend re-entry lock: rejected on 1m and 5m.
-                reentry_lock: !matches!(timeframe, Timeframe::M1 | Timeframe::M5),
+                reentry_lock: matches!(timeframe, Timeframe::M1 | Timeframe::M5),
             })
         }
         PlanKind::MeanReversion => {
