@@ -91,6 +91,7 @@ fn profile(release_id: Uuid, plan: PlanKind, timeframe: Timeframe) -> Materializ
             sweep_max_bars_valid: 10,
             displacement_max_bars_valid: 5,
             entry_max_bars_valid: 10,
+            setup_age_limits: true,
         }),
         required_timeframes: vec![timeframe],
         minimum_history_bars: 100,
@@ -302,6 +303,34 @@ async fn postgres_contract_preserves_immutability_idempotency_and_atomicity() {
         .unwrap()
         .unwrap();
     assert_eq!(first_lease.work_id, lease_work_id);
+    let late_close = NOW_MS - 60_000;
+    let late_id = Uuid::now_v7();
+    work_items
+        .enqueue(&work(late_id, second_release_id, late_close))
+        .await
+        .unwrap();
+    assert!(
+        work_items
+            .lease_next("late-worker", NOW_MS + 1)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    // Once the first lease expires, the oldest pending boundary can run.
+    let late = work_items
+        .lease_next("late-worker", NOW_MS + 60_001)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(late.work_id, late_id);
+    work_items
+        .complete_evaluation(EvaluationCommit {
+            work_id: late_id,
+            lease_attempt: late.attempt_count,
+            ..EvaluationCommit::default()
+        })
+        .await
+        .unwrap();
     let reclaimed = work_items
         .lease_next("worker-b", NOW_MS + 60_001)
         .await

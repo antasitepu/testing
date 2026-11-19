@@ -42,6 +42,7 @@ fn parameters(plan: PlanKind, timeframe: Timeframe) -> PlanParameters {
             sweep_max_bars_valid: 10,
             displacement_max_bars_valid: 5,
             entry_max_bars_valid: 10,
+            setup_age_limits: true,
         }),
         PlanKind::Smc => PlanParameters::Smc(SmcParameters {
             higher_timeframe: higher,
@@ -95,6 +96,7 @@ fn parameters(plan: PlanKind, timeframe: Timeframe) -> PlanParameters {
             trailing_activation_r: Decimal::new(1, 0),
             chandelier_period: 22,
             chandelier_atr_multiplier: Decimal::new(3, 0),
+            reentry_lock: true,
         }),
         PlanKind::MeanReversion => PlanParameters::MeanReversion(MeanReversionParameters {
             bollinger_period: 20,

@@ -27,5 +27,5 @@ pub use session_breakout::{
     SessionBreakoutEvaluator, session_breakout_runs_on, validate_session_breakout_entry,
 };
 pub use smc::SmcEvaluator;
-pub use trend_breakout::TrendBreakoutEvaluator;
+pub use trend_breakout::{TrendBreakoutEvaluator, reversed_trade_state};
 pub use volatility_squeeze::VolatilitySqueezeEvaluator;

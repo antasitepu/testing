@@ -91,6 +91,7 @@ fn profile(release_id: Uuid) -> MaterializedProfile {
             trailing_activation_r: Decimal::ONE,
             chandelier_period: 2,
             chandelier_atr_multiplier: Decimal::ONE,
+            reentry_lock: true,
         }),
         required_timeframes: vec![Timeframe::M1],
         minimum_history_bars: 2,
@@ -999,4 +1000,63 @@ fn signal_expired_across_a_session_gap_releases_the_slot() {
         .map(|execution| execution.time)
         .collect();
     assert_eq!(entries, vec![240_000]);
+}
+
+#[test]
+fn reverse_opens_an_opposite_trade_and_exit_at_open_excludes_later_extremes() {
+    let release = Uuid::now_v7();
+    let mut reverse = signal(release, 119_999);
+    reverse.direction = Direction::Sell;
+    reverse.stop_loss = Decimal::from(115);
+    reverse.primary_target = Decimal::from(80);
+    let mut reversal_frame = frame(120_000, 100, 150, 50, 100, false);
+    reversal_frame.directives.push(ManagementDirective {
+        directive_id: Uuid::now_v7(),
+        signal_id: signal(release, 59_999).signal_id,
+        virtual_trade_id: None,
+        kind: DirectiveKind::ReverseAtNextOpen,
+        effective_at: 120_000,
+        price: None,
+        reason: "opposite breakout".into(),
+        source_closed_candle_time: 119_999,
+        algorithm_version: reverse.algorithm_version.clone(),
+        parameter_version: reverse.parameter_version.clone(),
+        reverse_signal: Some(reverse.clone()),
+    });
+    let evaluator = ScriptedEvaluator {
+        release_id: release,
+        emit_at: vec![59_999],
+        exit_at: vec![],
+        cancel_at: vec![],
+        limit_entry: false,
+        fail_at: None,
+    };
+    let result = BacktestReplay::new(run_input(release), profile(release))
+        .run(
+            &evaluator,
+            vec![
+                frame(0, 100, 100, 100, 100, false),
+                frame(60_000, 100, 101, 99, 100, false),
+                reversal_frame,
+            ],
+        )
+        .unwrap();
+    use backtest_engine::ExecutionKind;
+    assert_eq!(
+        result.executions.iter().map(|e| e.kind).collect::<Vec<_>>(),
+        [
+            ExecutionKind::Entry,
+            ExecutionKind::ReverseExit,
+            ExecutionKind::ReverseEntry,
+            ExecutionKind::StopLoss
+        ]
+    );
+    assert_eq!(result.trades.len(), 2);
+    let old = &result.trades[0];
+    assert_eq!(
+        (old.mfe_r, old.mae_r),
+        (Decimal::new(1, 1), Decimal::new(-1, 1))
+    );
+    assert_eq!(result.trades[1].signal_id, reverse.signal_id);
+    assert_eq!(result.trades[1].entry_time, old.exit_time);
 }

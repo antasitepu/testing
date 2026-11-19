@@ -337,9 +337,19 @@ async fn disconnect_degrades_then_reconnects_and_cancellation_stops_loop() {
             }
         );
     }
-    tokio::time::advance(Duration::from_secs(1)).await;
+    tokio::time::advance(Duration::from_millis(500)).await;
+    assert_eq!(stream.connections.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        hub.snapshot(&symbol(), Timeframe::M1).await.status,
+        LiveStatus::Degraded
+    );
+    tokio::time::advance(Duration::from_millis(500)).await;
     tokio::task::yield_now().await;
     assert_eq!(stream.connections.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        hub.snapshot(&symbol(), Timeframe::M1).await.status,
+        LiveStatus::Ready
+    );
     shutdown_tx.send(true).unwrap();
     task.await.unwrap().unwrap();
 }

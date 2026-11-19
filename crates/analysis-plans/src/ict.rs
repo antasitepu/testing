@@ -156,7 +156,8 @@ fn find_setup(
     else {
         return Ok(None);
     };
-    if !within_bars(
+    if !within_age_limit(
+        parameters,
         sweep.id.confirmed_at,
         snapshot.evaluated_closed_candle_time,
         target_bar,
@@ -174,7 +175,8 @@ fn find_setup(
     else {
         return Ok(None);
     };
-    if !within_bars(
+    if !within_age_limit(
+        parameters,
         sweep.id.confirmed_at,
         displacement.id.confirmed_at,
         target_bar,
@@ -292,7 +294,8 @@ fn bias_direction(
         .into_iter()
         .max_by_key(|fact| fact.id.confirmed_at)
         .filter(|structure| {
-            within_bars(
+            within_age_limit(
+                parameters,
                 structure.id.confirmed_at,
                 snapshot.evaluated_closed_candle_time,
                 timeframe.duration_ms(),
@@ -300,6 +303,17 @@ fn bias_direction(
             )
         })
         .map(|structure| structure.direction))
+}
+
+/// The age limit holds, or the profile turned the limits off (`ict-v4` behaviour).
+fn within_age_limit(
+    parameters: &IctParameters,
+    earlier: i64,
+    later: i64,
+    bar_ms: i64,
+    max_bars: i32,
+) -> bool {
+    !parameters.setup_age_limits || within_bars(earlier, later, bar_ms, max_bars)
 }
 
 /// `later` is at most `max_bars` bars of `bar_ms` after `earlier`.

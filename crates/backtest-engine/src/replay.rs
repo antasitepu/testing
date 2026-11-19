@@ -229,7 +229,7 @@ impl BacktestReplaySession<'_> {
             .map(|directive| directive.signal_id)
             .collect();
         let mut still_pending = Vec::new();
-        for signal in self.pending_signals.drain(..) {
+        for signal in std::mem::take(&mut self.pending_signals) {
             if signal
                 .expires_at
                 .is_some_and(|expires_at| frame.candle.open_time >= expires_at)
@@ -248,23 +248,7 @@ impl BacktestReplaySession<'_> {
             } else {
                 for item in signal_executions {
                     if item.kind == ExecutionKind::Entry {
-                        let virtual_trade_id = deterministic_uuid(&[
-                            item.signal_id.as_bytes(),
-                            &item.time.to_be_bytes(),
-                            b"entry",
-                        ]);
-                        feedback.push(PlanFeedback::ActualEntry {
-                            signal_id: item.signal_id,
-                            virtual_trade_id,
-                            time: item.time,
-                            price: item.price,
-                        });
-                        self.open_trade = Some(OpenTrade::new(
-                            self.trades.len() as i64,
-                            signal.clone(),
-                            item.clone(),
-                            virtual_trade_id,
-                        ));
+                        self.record_entry(&signal, &item, &mut feedback);
                     }
                     if item.kind == ExecutionKind::EntryCancelled && self.open_trade.is_none() {
                         release_unfilled_setup(
@@ -279,15 +263,43 @@ impl BacktestReplaySession<'_> {
         }
         self.pending_signals = still_pending;
 
-        if let Some(trade) = &mut self.open_trade {
-            trade.observe(
-                &self
-                    .spread
-                    .exit_candle(&frame.candle, trade.signal.direction),
-            );
-        }
         let exit_executions = self.execution.on_candle(&frame.candle, &due_directives);
+        if let Some(trade) = &mut self.open_trade {
+            let candle = self
+                .spread
+                .exit_candle(&frame.candle, trade.signal.direction);
+            if exit_executions.first().is_some_and(|step| {
+                matches!(
+                    step.kind,
+                    ExecutionKind::ExitAtNextOpen
+                        | ExecutionKind::SuggestClose
+                        | ExecutionKind::EmergencyExit
+                        | ExecutionKind::ReverseExit
+                )
+            }) {
+                trade.observe(candle.open, candle.open);
+            } else {
+                trade.observe(candle.low, candle.high);
+            }
+        }
         for item in exit_executions {
+            if item.kind == ExecutionKind::ReverseEntry {
+                let reverse = due_directives
+                    .iter()
+                    .filter_map(|d| d.reverse_signal.as_ref())
+                    .find(|s| s.signal_id == item.signal_id)
+                    .expect("reverse execution comes from a supplied signal");
+                self.state = analysis_plans::reversed_trade_state(&self.profile, reverse.clone())
+                    .map_err(BacktestReplayError::Evaluation)?;
+                // Feedback above belongs to the position that finished at this open.
+                feedback.clear();
+                self.signal_times.push(reverse.effective_at);
+                self.record_entry(reverse, &item, &mut feedback);
+                let quote = self.spread.exit_candle(&frame.candle, reverse.direction);
+                if let Some(trade) = &mut self.open_trade {
+                    trade.observe(quote.low, quote.high);
+                }
+            }
             if item.kind == ExecutionKind::PartialTakeProfit
                 && let Some(trade) = &mut self.open_trade
             {
@@ -339,6 +351,31 @@ impl BacktestReplaySession<'_> {
         self.pending_directives
             .extend(evaluation.directives.iter().cloned());
         Ok(())
+    }
+
+    fn record_entry(
+        &mut self,
+        signal: &SignalDefinition,
+        item: &SimulatedExecution,
+        feedback: &mut Vec<PlanFeedback>,
+    ) {
+        let virtual_trade_id = deterministic_uuid(&[
+            item.signal_id.as_bytes(),
+            &item.time.to_be_bytes(),
+            b"entry",
+        ]);
+        feedback.push(PlanFeedback::ActualEntry {
+            signal_id: item.signal_id,
+            virtual_trade_id,
+            time: item.time,
+            price: item.price,
+        });
+        self.open_trade = Some(OpenTrade::new(
+            self.trades.len() as i64,
+            signal.clone(),
+            item.clone(),
+            virtual_trade_id,
+        ));
     }
 
     pub fn finish(self, frame_count: u64) -> BacktestReplayResult {
@@ -415,20 +452,20 @@ impl OpenTrade {
         self.partial_execution_count += 1;
     }
 
-    fn observe(&mut self, candle: &Candle) {
+    fn observe(&mut self, low: Decimal, high: Decimal) {
         let risk = risk(&self.signal, self.entry.price);
         if risk.is_zero() {
             return;
         }
         let favorable = if self.signal.direction == Direction::Buy {
-            candle.high - self.entry.price
+            high - self.entry.price
         } else {
-            self.entry.price - candle.low
+            self.entry.price - low
         };
         let adverse = if self.signal.direction == Direction::Buy {
-            candle.low - self.entry.price
+            low - self.entry.price
         } else {
-            self.entry.price - candle.high
+            self.entry.price - high
         };
         self.mfe_r = self.mfe_r.max(favorable / risk);
         self.mae_r = self.mae_r.min(adverse / risk);

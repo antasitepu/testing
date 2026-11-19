@@ -1194,3 +1194,33 @@ fn release_fixture_keeps_lifecycle_explicit() {
     };
     assert_eq!(release.lifecycle, ReleaseLifecycle::Active);
 }
+
+#[tokio::test]
+async fn repaired_older_candle_cannot_rewind_a_live_profile() {
+    let release = Uuid::now_v7();
+    let profile = profile(release, PlanKind::Ict, true);
+    let record = PlanRuntimeStateRecord {
+        key: profile.key.clone(),
+        release_id: release,
+        state: serde_json::to_value(PlanRuntimeState::neutral(&profile)).unwrap(),
+        last_evaluated_close_time: 299_999,
+    };
+    let (worker, store, _) = worker(
+        release,
+        ReleaseMode::PaperActive,
+        vec![profile],
+        HashMap::new(),
+        GapMock::default(),
+        vec![],
+    );
+    *store.runtime_state.lock().unwrap() = Some(record);
+    store.queue.lock().unwrap().front_mut().unwrap().source = WorkSource::DowntimeReconciled;
+    assert_eq!(
+        worker.run_once("worker", 360_000).await.unwrap(),
+        WorkerStep::Completed
+    );
+    let commits = store.commits.lock().unwrap();
+    assert!(commits[0].runtime_states.is_empty());
+    assert!(commits[0].evaluations.is_empty());
+    assert!(commits[0].signals.is_empty());
+}

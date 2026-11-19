@@ -54,6 +54,8 @@ pub struct NewMonitoringEvent {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DurableTransition {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub opened_reverse_signals: Vec<SignalDefinition>,
     pub tracker_state: Option<TrackerState>,
     pub tracker_states: Vec<TrackerState>,
     pub virtual_trade_write: Option<VirtualTradeWrite>,
@@ -93,6 +95,8 @@ impl DurableTransition {
     /// it has no monitoring outbox row (for example MFE/MAE checkpoints).
     /// Folds `other` into this transition so several steps commit atomically.
     pub fn absorb(&mut self, other: DurableTransition) {
+        self.opened_reverse_signals
+            .extend(other.opened_reverse_signals);
         if let Some(state) = other.tracker_state {
             if self.tracker_state.is_none() {
                 self.tracker_state = Some(state);
@@ -122,7 +126,8 @@ impl DurableTransition {
     }
 
     pub fn needs_commit(&self) -> bool {
-        self.tracker_state.is_some()
+        !self.opened_reverse_signals.is_empty()
+            || self.tracker_state.is_some()
             || !self.tracker_states.is_empty()
             || self.virtual_trade_write.is_some()
             || !self.virtual_trade_writes.is_empty()

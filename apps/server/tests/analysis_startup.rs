@@ -114,6 +114,7 @@ fn profile(release_id: Uuid) -> MaterializedProfile {
             trailing_activation_r: Decimal::ONE,
             chandelier_period: 22,
             chandelier_atr_multiplier: Decimal::new(3, 0),
+            reentry_lock: true,
         }),
         required_timeframes: Vec::new(),
         minimum_history_bars: 200,

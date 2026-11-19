@@ -131,6 +131,24 @@ impl SignalStore for SignalRepository {
 
 #[async_trait]
 impl PlanFeedbackStore for SignalRepository {
+    async fn executed_reverse(
+        &self,
+        closed_signal_id: uuid::Uuid,
+    ) -> Result<Option<SignalDefinition>, AnalysisServiceError> {
+        let definition: Option<serde_json::Value> = sqlx::query_scalar(
+            "SELECT s.definition FROM tracker_states t JOIN signals s \
+             ON s.signal_id = (t.state->>'reverseSignalId')::uuid WHERE t.signal_id = $1",
+        )
+        .bind(closed_signal_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| storage_sqlx_error("load executed reverse", e))?;
+        definition
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|e| AnalysisServiceError::InvalidData(e.to_string()))
+    }
+
     async fn pending_feedback(
         &self,
         signal_id: uuid::Uuid,

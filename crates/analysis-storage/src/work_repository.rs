@@ -79,9 +79,14 @@ impl AnalysisWorkStore for WorkRepository {
         }
         let row = sqlx::query(
             "WITH candidate AS ( \
-                 SELECT work_id FROM analysis_work_items \
-                 WHERE status = 'PENDING' \
-                    OR (status = 'LEASED' AND lease_expires_at <= to_timestamp($2 / 1000.0)) \
+                 SELECT w.work_id FROM analysis_work_items w \
+                 WHERE (w.status = 'PENDING' \
+                    OR (w.status = 'LEASED' AND w.lease_expires_at <= to_timestamp($2 / 1000.0))) \
+                   AND NOT EXISTS (SELECT 1 FROM analysis_work_items older \
+                       WHERE older.symbol = w.symbol AND older.interval = w.interval \
+                         AND older.release_id = w.release_id AND older.status IN ('PENDING', 'LEASED') \
+                         AND (older.close_time < w.close_time OR (older.work_id <> w.work_id \
+                              AND older.status = 'LEASED' AND older.lease_expires_at > to_timestamp($2 / 1000.0)))) \
                  ORDER BY close_time, created_at, work_id \
                  FOR UPDATE SKIP LOCKED \
                  LIMIT 1 \
@@ -136,14 +141,16 @@ impl AnalysisWorkStore for WorkRepository {
         }
 
         for state in &commit.runtime_states {
-            sqlx::query(
+            let write = sqlx::query(
                 "INSERT INTO plan_runtime_states \
                  (symbol, plan, interval, release_id, state, last_evaluated_close_time) \
                  VALUES ($1, $2, $3, $4, $5, $6) \
                  ON CONFLICT (symbol, plan, interval) DO UPDATE SET \
                     release_id = EXCLUDED.release_id, state = EXCLUDED.state, \
                     last_evaluated_close_time = EXCLUDED.last_evaluated_close_time, \
-                    updated_at = NOW()",
+                    updated_at = NOW() \
+                 WHERE plan_runtime_states.release_id <> EXCLUDED.release_id \
+                    OR plan_runtime_states.last_evaluated_close_time < EXCLUDED.last_evaluated_close_time",
             )
             .bind(state.key.symbol.as_str())
             .bind(state.key.plan.as_str())
@@ -154,6 +161,11 @@ impl AnalysisWorkStore for WorkRepository {
             .execute(&mut *transaction)
             .await
             .map_err(|error| storage_sqlx_error("upsert plan runtime state", error))?;
+            if write.rows_affected() == 0 {
+                return Err(AnalysisServiceError::Conflict(
+                    "runtime state already advanced".into(),
+                ));
+            }
         }
 
         for signal in &commit.signals {

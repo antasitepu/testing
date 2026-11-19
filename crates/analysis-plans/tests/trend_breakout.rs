@@ -60,6 +60,7 @@ fn profile() -> MaterializedProfile {
             trailing_activation_r: Decimal::ONE,
             chandelier_period: 20,
             chandelier_atr_multiplier: Decimal::new(3, 0),
+            reentry_lock: true,
         }),
         required_timeframes: vec![Timeframe::M5],
         minimum_history_bars: 100,
@@ -819,4 +820,26 @@ fn the_lock_survives_shared_trade_state_writes() {
     assert_eq!(open.next_state.trade_state, TradeState::Open);
     assert_eq!(open.next_state.internal["trendReentryLock"], json!("BUY"));
     assert!(open.next_state.internal.get("entryPrice").is_some());
+}
+
+#[test]
+fn without_the_reentry_lock_the_same_breakout_signals_again() {
+    // Spec 2026-11-19 Trend re-entry lock, rejected on 1m and 5m: `trend-v4` behaviour.
+    let mut profile = profile();
+    let analysis_domain::PlanParameters::TrendBreakout(parameters) = &mut profile.parameters else {
+        panic!("expected trend breakout parameters");
+    };
+    parameters.reentry_lock = false;
+    let buy = snapshot(Direction::Buy, Decimal::new(4_100, 0), Decimal::new(30, 0));
+    let evaluation = TrendBreakoutEvaluator
+        .evaluate(&profile, &buy, &locked_state(&profile, "BUY"), &[])
+        .unwrap();
+    assert_eq!(evaluation.signal.unwrap().direction, Direction::Buy);
+    assert!(
+        evaluation
+            .next_state
+            .internal
+            .get("trendReentryLock")
+            .is_none()
+    );
 }

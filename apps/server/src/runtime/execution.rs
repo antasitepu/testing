@@ -203,6 +203,11 @@ pub async fn run_execution_loop(runtime: ExecutionRuntime) -> Result<(), Executi
                         record_activity(ActivityKind::Execution, current_unix_millis());
                     }
                     Ok(event) => {
+                        if let MarketEvent::FormingCandle(candle) | MarketEvent::ClosedCandle(candle) = &event
+                            && supervisor.observe_candle_open(candle)
+                        {
+                            process_due_directives(&mut supervisor, &execution_pool, &execution_symbol, &mut delivered_directives).await?;
+                        }
                         let step = supervisor.process(SupervisorEvent::Market(event)).await?;
                         if matches!(step, SupervisorStep::GapDetected | SupervisorStep::Frozen) {
                             tracing::warn!(?step, "execution market processing requires recovery");
@@ -365,8 +370,17 @@ pub(super) async fn process_pending_execution_inputs(
         .await?;
     }
 
+    process_due_directives(supervisor, pool, symbol, delivered_directives).await
+}
+
+async fn process_due_directives(
+    supervisor: &mut ExecutionSupervisor,
+    pool: &PgPool,
+    symbol: &Symbol,
+    delivered_directives: &mut HashSet<uuid::Uuid>,
+) -> Result<(), ExecutionError> {
     let now_ms = current_unix_millis();
-    for directive in pending_directives(pool, now_ms, 100).await? {
+    for directive in resolve_pending_directives(pool, now_ms, 100, Some(supervisor)).await? {
         if delivered_directives.contains(&directive.directive_id) {
             continue;
         }
@@ -404,7 +418,13 @@ async fn process_stored_next_open_canonical_open(
     if signal.execution_instruction != ExecutionInstruction::NextOpen {
         return Ok(());
     }
-    let entry_open = next_open_entry_time(pool, signal).await?;
+    let entry_open = tradable_open_time(
+        pool,
+        &signal.symbol,
+        signal.target_timeframe,
+        signal.effective_at,
+    )
+    .await?;
     if entry_open > signal.effective_at {
         supervisor.delay_next_open(signal.signal_id, entry_open);
     }
@@ -481,40 +501,36 @@ async fn market_closed_at(
 
 /// `NO_TRADING` delays a next open to the first tradable bar, which is also where the backtest
 /// fills. Without session coverage the signal keeps its own boundary.
-async fn next_open_entry_time(
+async fn tradable_open_time(
     pool: &PgPool,
-    signal: &SignalDefinition,
+    symbol: &Symbol,
+    timeframe: Timeframe,
+    effective_at: i64,
 ) -> Result<i64, ExecutionError> {
     let storage_error = |error: market_storage::StorageError| ExecutionError::Storage {
         operation: "load sessions for next open",
         message: error.to_string(),
     };
     let Some(market) = MarketRepository::new(pool.clone())
-        .load(&signal.symbol)
+        .load(symbol)
         .await
         .map_err(storage_error)?
     else {
-        return Ok(signal.effective_at);
+        return Ok(effective_at);
     };
     let sessions = SessionRepository::new(pool.clone())
         .between(
             &market.session_market,
-            signal.effective_at,
-            signal
-                .effective_at
-                .saturating_add(NEXT_OPEN_SESSION_LOOKAHEAD_MS),
+            effective_at,
+            effective_at.saturating_add(NEXT_OPEN_SESSION_LOOKAHEAD_MS),
         )
         .await
         .map_err(storage_error)?;
-    let entry_open = TradableCandlePolicy.first_tradable_open(
-        signal.target_timeframe,
-        signal.effective_at,
-        &sessions,
-    );
+    let entry_open = TradableCandlePolicy.first_tradable_open(timeframe, effective_at, &sessions);
     if entry_open.is_none() {
-        tracing::warn!(signal_id = %signal.signal_id, "next-open entry has no session coverage");
+        tracing::warn!(%symbol, "next open has no session coverage");
     }
-    Ok(entry_open.unwrap_or(signal.effective_at))
+    Ok(entry_open.unwrap_or(effective_at))
 }
 
 async fn load_first_candle_at_or_after(
@@ -841,6 +857,15 @@ pub async fn pending_directives(
     now_ms: i64,
     limit: i64,
 ) -> Result<Vec<ManagementDirective>, ExecutionError> {
+    resolve_pending_directives(pool, now_ms, limit, None).await
+}
+
+async fn resolve_pending_directives(
+    pool: &PgPool,
+    now_ms: i64,
+    limit: i64,
+    supervisor: Option<&ExecutionSupervisor>,
+) -> Result<Vec<ManagementDirective>, ExecutionError> {
     if !(1..=1_000).contains(&limit) || now_ms < 0 {
         return Err(ExecutionError::InvalidData(
             "pending execution directive limit/time is invalid".to_owned(),
@@ -855,74 +880,80 @@ pub async fn pending_directives(
             operation: "load pending execution directives",
             message: error.to_string(),
         })?;
-    rows.into_iter()
-        .map(|row| {
-            let mut directive: ManagementDirective = serde_json::from_value(row.get("payload"))
-                .map_err(|error| ExecutionError::InvalidData(error.to_string()))?;
-            if directive.price.is_none() {
-                directive.price = row.get("canonical_open");
+    let mut ready = Vec::new();
+    for row in rows {
+        let mut directive: ManagementDirective = serde_json::from_value(row.get("payload"))
+            .map_err(|e| ExecutionError::InvalidData(e.to_string()))?;
+        if directive.price.is_none()
+            && matches!(
+                directive.kind,
+                analysis_domain::DirectiveKind::ExitAtNextOpen
+                    | analysis_domain::DirectiveKind::ReverseAtNextOpen
+                    | analysis_domain::DirectiveKind::SuggestClose
+                    | analysis_domain::DirectiveKind::EmergencyExit
+            )
+        {
+            let symbol = Symbol::new(row.get::<String, _>("symbol"))
+                .map_err(|e| ExecutionError::InvalidData(e.to_string()))?;
+            let tf = row
+                .get::<&str, _>("interval")
+                .parse::<Timeframe>()
+                .map_err(|e| ExecutionError::InvalidData(e.to_string()))?;
+            let open_time = tradable_open_time(pool, &symbol, tf, directive.effective_at).await?;
+            if open_time > now_ms {
+                continue;
             }
-            Ok(directive)
-        })
-        .collect()
+            directive.price = match supervisor.and_then(|s| s.candle_open(&symbol, tf, open_time)) {
+                Some(price) => Some(price),
+                None => sqlx::query_scalar(
+                    "SELECT open FROM candles WHERE symbol=$1 AND interval=$2 AND open_time=$3",
+                )
+                .bind(symbol.as_str())
+                .bind(tf.as_str())
+                .bind(open_time)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| ExecutionError::Storage {
+                    operation: "load directive canonical open",
+                    message: e.to_string(),
+                })?,
+            };
+            if directive.price.is_none() {
+                continue;
+            }
+            directive.effective_at = open_time;
+        }
+        ready.push(directive);
+        if ready.len() == limit as usize {
+            break;
+        }
+    }
+    Ok(ready)
 }
 
-const PENDING_EXECUTION_DIRECTIVES_SQL: &str = "WITH active_signal_ids AS ( \
+macro_rules! pending_directives_sql {
+    () => {
+        "WITH active_signal_ids AS ( \
          SELECT signal_id FROM tracker_states \
          WHERE state->>'setupState' = 'ENTRY_AVAILABLE' \
            AND state->>'tradeState' = 'NOT_ENTERED' \
          UNION \
          SELECT signal_id FROM virtual_trades WHERE trade_state = 'OPEN' \
      ) \
-     SELECT d.payload, c.open AS canonical_open \
+     SELECT d.payload, s.symbol, s.interval \
      FROM active_signal_ids active \
      JOIN LATERAL ( \
          SELECT * FROM trade_management_directives d \
-         WHERE d.signal_id = active.signal_id \
-           AND d.consumed_at IS NULL \
-           AND d.effective_at <= $1 \
-         ORDER BY d.effective_at, d.directive_id \
-         LIMIT $2 \
-     ) d ON TRUE \
-     JOIN signals s ON s.signal_id = d.signal_id \
-     LEFT JOIN candles c \
-       ON c.symbol = s.symbol \
-      AND c.interval = s.interval \
-      AND c.open_time = d.effective_at \
-     WHERE (d.kind NOT IN ('EXIT_AT_NEXT_OPEN', 'REVERSE_AT_NEXT_OPEN', 'SUGGEST_CLOSE', 'EMERGENCY_EXIT') \
-            OR (d.payload->>'price') IS NOT NULL \
-            OR c.open IS NOT NULL) \
-     ORDER BY d.effective_at, d.directive_id LIMIT $2";
+         WHERE d.signal_id = active.signal_id AND d.consumed_at IS NULL AND d.effective_at <= $1 \
+         ORDER BY d.effective_at, d.directive_id LIMIT $2 \
+     ) d ON TRUE JOIN signals s ON s.signal_id = d.signal_id \
+     ORDER BY d.effective_at, d.directive_id"
+    };
+}
 
-const PENDING_EXECUTION_DIRECTIVES_EXPLAIN_SQL: &str = concat!(
-    "EXPLAIN (ANALYZE, FORMAT JSON) ",
-    "WITH active_signal_ids AS ( \
-         SELECT signal_id FROM tracker_states \
-         WHERE state->>'setupState' = 'ENTRY_AVAILABLE' \
-           AND state->>'tradeState' = 'NOT_ENTERED' \
-         UNION \
-         SELECT signal_id FROM virtual_trades WHERE trade_state = 'OPEN' \
-     ) \
-     SELECT d.payload, c.open AS canonical_open \
-     FROM active_signal_ids active \
-     JOIN LATERAL ( \
-         SELECT * FROM trade_management_directives d \
-         WHERE d.signal_id = active.signal_id \
-           AND d.consumed_at IS NULL \
-           AND d.effective_at <= $1 \
-         ORDER BY d.effective_at, d.directive_id \
-         LIMIT $2 \
-     ) d ON TRUE \
-     JOIN signals s ON s.signal_id = d.signal_id \
-     LEFT JOIN candles c \
-       ON c.symbol = s.symbol \
-      AND c.interval = s.interval \
-      AND c.open_time = d.effective_at \
-     WHERE (d.kind NOT IN ('EXIT_AT_NEXT_OPEN', 'REVERSE_AT_NEXT_OPEN', 'SUGGEST_CLOSE', 'EMERGENCY_EXIT') \
-            OR (d.payload->>'price') IS NOT NULL \
-            OR c.open IS NOT NULL) \
-     ORDER BY d.effective_at, d.directive_id LIMIT $2"
-);
+const PENDING_EXECUTION_DIRECTIVES_SQL: &str = pending_directives_sql!();
+const PENDING_EXECUTION_DIRECTIVES_EXPLAIN_SQL: &str =
+    concat!("EXPLAIN (ANALYZE, FORMAT JSON) ", pending_directives_sql!());
 
 pub fn pending_execution_directives_explain_sql() -> &'static str {
     PENDING_EXECUTION_DIRECTIVES_EXPLAIN_SQL

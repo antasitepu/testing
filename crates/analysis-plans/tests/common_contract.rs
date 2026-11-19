@@ -45,6 +45,7 @@ fn profile(release_id: Uuid) -> MaterializedProfile {
             sweep_max_bars_valid: 10,
             displacement_max_bars_valid: 5,
             entry_max_bars_valid: 10,
+            setup_age_limits: true,
         }),
         required_timeframes: vec![Timeframe::M5],
         minimum_history_bars: 200,

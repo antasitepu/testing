@@ -157,6 +157,34 @@ impl TrackerStore for TrackerRepository {
         } else {
             false
         };
+        // The reverse definition and both legs become visible together so the polling
+        // worker cannot dispatch the opposite signal as a separate recommendation.
+        for signal in &transition.opened_reverse_signals {
+            sqlx::query(
+                "INSERT INTO signals (signal_id, symbol, plan, interval, definition, evidence, \
+                    release_id, algorithm_version, parameter_version, created_at) \
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,to_timestamp($10 / 1000.0))",
+            )
+            .bind(signal.signal_id)
+            .bind(signal.symbol.as_str())
+            .bind(signal.plan.as_str())
+            .bind(signal.target_timeframe.as_str())
+            .bind(
+                serde_json::to_value(signal)
+                    .map_err(|e| storage_error("serialize reverse signal", e))?,
+            )
+            .bind(
+                serde_json::to_value(&signal.evidence)
+                    .map_err(|e| storage_error("serialize reverse evidence", e))?,
+            )
+            .bind(signal.release_id)
+            .bind(&signal.algorithm_version)
+            .bind(&signal.parameter_version)
+            .bind(signal.created_at)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|e| storage_sqlx_error("insert reverse signal", e))?;
+        }
         if let Some(write) = transition.virtual_trade_write {
             insert_trade(&mut transaction, &write.trade, supports_management_order).await?;
         }

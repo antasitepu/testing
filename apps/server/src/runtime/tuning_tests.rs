@@ -556,7 +556,7 @@ fn default_runtime_profile_uses_tuned_ict_m30_parameters() {
 
     assert_eq!(
         profile.versions.parameter_version,
-        "ICT-30m-runtime-v3-pp1-pc1"
+        "ICT-30m-runtime-v4-pp1-pc1"
     );
     let PlanParameters::Ict(parameters) = profile.parameters else {
         panic!("expected ICT parameters");
@@ -569,6 +569,8 @@ fn default_runtime_profile_uses_tuned_ict_m30_parameters() {
     assert_eq!(parameters.atr_buffer_multiplier, Decimal::new(1, 1));
     assert_eq!(parameters.minimum_rr, Decimal::new(1, 0));
     assert_eq!(parameters.entry_max_bars_valid, 20);
+    // Spec 2026-11-19 ICT age limits: rejected on 30m.
+    assert!(!parameters.setup_age_limits);
 }
 
 #[test]
@@ -723,7 +725,7 @@ fn default_runtime_profile_uses_long_run_viable_trend_parameters() {
     let cases = [
         (
             Timeframe::M1,
-            "TREND_BREAKOUT-1m-runtime-v2-pp1-pc1",
+            "TREND_BREAKOUT-1m-runtime-v3-pp1-pc1",
             Some(Timeframe::M5),
             Decimal::new(20, 0),
             Decimal::new(2, 0),
@@ -732,7 +734,7 @@ fn default_runtime_profile_uses_long_run_viable_trend_parameters() {
         ),
         (
             Timeframe::M5,
-            "TREND_BREAKOUT-5m-runtime-v2-pp1-pc1",
+            "TREND_BREAKOUT-5m-runtime-v3-pp1-pc1",
             Some(Timeframe::M15),
             Decimal::new(20, 0),
             Decimal::new(15, 1),
@@ -807,6 +809,11 @@ fn default_runtime_profile_uses_long_run_viable_trend_parameters() {
         );
         assert_eq!(parameters.target_rr, target_rr);
         assert_eq!(parameters.trailing_activation_r, trailing_activation_r);
+        // Spec 2026-11-19 Trend re-entry lock: rejected on 1m and 5m.
+        assert_eq!(
+            parameters.reentry_lock,
+            !matches!(timeframe, Timeframe::M1 | Timeframe::M5)
+        );
     }
 }
 
@@ -4463,6 +4470,7 @@ fn ict_candidates(timeframe: Timeframe) -> Vec<Candidate> {
                                 sweep_max_bars_valid: 10,
                                 displacement_max_bars_valid: 5,
                                 entry_max_bars_valid,
+                                setup_age_limits: true,
                             }),
                         });
                     }
@@ -4574,6 +4582,7 @@ fn trend_breakout_candidates(timeframe: Timeframe) -> Vec<Candidate> {
                                 trailing_activation_r,
                                 chandelier_period: 22,
                                 chandelier_atr_multiplier: Decimal::new(3, 0),
+                                reentry_lock: true,
                             }),
                         });
                     }

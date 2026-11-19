@@ -283,6 +283,8 @@ pub(super) fn default_parameters(plan: PlanKind, timeframe: Timeframe) -> PlanPa
                 sweep_max_bars_valid: 10,
                 displacement_max_bars_valid: 5,
                 entry_max_bars_valid,
+                // Spec 2026-11-19 ICT age limits: rejected on 30m and 1h.
+                setup_age_limits: !matches!(timeframe, Timeframe::M30 | Timeframe::H1),
             })
         }
         PlanKind::Smc => {
@@ -457,6 +459,8 @@ pub(super) fn default_parameters(plan: PlanKind, timeframe: Timeframe) -> PlanPa
                 trailing_activation_r,
                 chandelier_period: 22,
                 chandelier_atr_multiplier: Decimal::new(3, 0),
+                // Spec 2026-11-19 Trend re-entry lock: rejected on 1m and 5m.
+                reentry_lock: !matches!(timeframe, Timeframe::M1 | Timeframe::M5),
             })
         }
         PlanKind::MeanReversion => {
@@ -626,8 +630,8 @@ fn runtime_parameter_version(plan: PlanKind, target_timeframe: Timeframe) -> Str
         {
             "v3"
         }
-        PlanKind::Ict if target_timeframe == Timeframe::M5 => "v4",
-        PlanKind::Ict if matches!(target_timeframe, Timeframe::M1 | Timeframe::M30) => "v3",
+        PlanKind::Ict if matches!(target_timeframe, Timeframe::M5 | Timeframe::M30) => "v4",
+        PlanKind::Ict if matches!(target_timeframe, Timeframe::M1 | Timeframe::H1) => "v3",
         PlanKind::Rsi | PlanKind::Quasimodo => "v2",
         PlanKind::Smc
             if matches!(
@@ -639,15 +643,13 @@ fn runtime_parameter_version(plan: PlanKind, target_timeframe: Timeframe) -> Str
         }
         PlanKind::Smc => "v2",
         PlanKind::Ict => "v2",
+        PlanKind::TrendBreakout if matches!(target_timeframe, Timeframe::M1 | Timeframe::M5) => {
+            "v3"
+        }
         PlanKind::TrendBreakout
             if matches!(
                 target_timeframe,
-                Timeframe::M1
-                    | Timeframe::M5
-                    | Timeframe::M15
-                    | Timeframe::M30
-                    | Timeframe::H1
-                    | Timeframe::H4
+                Timeframe::M15 | Timeframe::M30 | Timeframe::H1 | Timeframe::H4
             ) =>
         {
             "v2"

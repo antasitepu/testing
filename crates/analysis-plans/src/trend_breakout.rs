@@ -70,6 +70,15 @@ impl PlanEvaluator for TrendBreakoutEvaluator {
         state: &PlanRuntimeState,
         feedback: &[PlanFeedback],
     ) -> Result<PlanEvaluation, PlanError> {
+        let analysis_domain::PlanParameters::TrendBreakout(parameters) = &profile.parameters else {
+            return Err(PlanError::SignalIdentityMismatch);
+        };
+        if !parameters.reentry_lock {
+            // `trend-v4` behaviour: immediate same-direction re-entry, no lock kept.
+            let mut evaluation = evaluate_inner(profile, snapshot, state, feedback, None)?;
+            store_reentry_lock(&mut evaluation.next_state, None)?;
+            return Ok(evaluation);
+        }
         let lock = reentry_lock(&state.internal)?;
         let mut evaluation = evaluate_inner(profile, snapshot, state, feedback, lock)?;
         let mut next_lock = lock;
@@ -92,6 +101,24 @@ impl PlanEvaluator for TrendBreakoutEvaluator {
         store_reentry_lock(&mut evaluation.next_state, next_lock)?;
         Ok(evaluation)
     }
+}
+
+/// Start management of the opposite leg with its own risk and feedback identity.
+pub fn reversed_trade_state(
+    profile: &MaterializedProfile,
+    signal: SignalDefinition,
+) -> Result<PlanRuntimeState, PlanError> {
+    let direction = signal.direction;
+    let mut state = PlanRuntimeState::neutral(profile);
+    if create_signal(&mut state, signal)? != CandidateDecision::Accepted {
+        return Err(PlanError::SignalIdentityMismatch);
+    }
+    if let analysis_domain::PlanParameters::TrendBreakout(parameters) = &profile.parameters
+        && parameters.reentry_lock
+    {
+        store_reentry_lock(&mut state, Some(direction))?;
+    }
+    Ok(state)
 }
 
 /// Spec *Re-entry*: after a signal, the same direction waits for a close back inside the

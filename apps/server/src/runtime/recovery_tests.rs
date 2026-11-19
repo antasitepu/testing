@@ -1162,8 +1162,20 @@ mod runtime_repair_tests {
 
     #[tokio::test]
     async fn close_advice_waits_for_and_executes_at_stored_canonical_open() {
+        verify_next_open_directive(false).await;
+    }
+
+    #[tokio::test]
+    async fn reverse_commits_both_legs_at_first_forming_open_after_closure() {
+        verify_next_open_directive(true).await;
+    }
+
+    async fn verify_next_open_directive(reverse_at_reopen: bool) {
         let (pool, _guard) = test_pool().await;
-        let signal = test_signal(uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
+        let mut signal = test_signal(uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
+        if reverse_at_reopen {
+            signal.plan = PlanKind::TrendBreakout;
+        }
         seed_signal(&pool, &signal).await;
 
         let mut supervisor =
@@ -1194,18 +1206,28 @@ mod runtime_repair_tests {
                 .await
                 .unwrap();
         let effective_at = NOW_MS + Timeframe::M1.duration_ms();
+        let mut reverse = signal.clone();
+        reverse.signal_id = uuid::Uuid::now_v7();
+        reverse.direction = Direction::Sell;
+        reverse.execution_instruction = ExecutionInstruction::NextOpen;
+        reverse.stop_loss = Decimal::from(4140);
+        reverse.primary_target = Decimal::from(4080);
         let directive = ManagementDirective {
             directive_id: uuid::Uuid::now_v7(),
             signal_id: signal.signal_id,
             virtual_trade_id: Some(virtual_trade_id),
-            kind: DirectiveKind::SuggestClose,
+            kind: if reverse_at_reopen {
+                DirectiveKind::ReverseAtNextOpen
+            } else {
+                DirectiveKind::SuggestClose
+            },
             effective_at,
             price: None,
             reason: "test close advice".to_owned(),
             source_closed_candle_time: effective_at - 1,
             algorithm_version: signal.algorithm_version.clone(),
             parameter_version: signal.parameter_version.clone(),
-            reverse_signal: None,
+            reverse_signal: reverse_at_reopen.then(|| reverse.clone()),
         };
         sqlx::query(
             "INSERT INTO trade_management_directives \
@@ -1235,16 +1257,36 @@ mod runtime_repair_tests {
         );
 
         let canonical_open = Decimal::new(4112, 0);
-        seed_candle(
-            &pool,
-            Timeframe::M1,
-            effective_at,
-            canonical_open,
-            Decimal::new(4116, 0),
-            Decimal::new(4110, 0),
-            Decimal::new(4114, 0),
-        )
-        .await;
+        let fill_time = if reverse_at_reopen {
+            let reopen = effective_at + 3 * Timeframe::M1.duration_ms();
+            seed_no_trading_session(&pool, effective_at, reopen).await;
+            seed_regular_session(&pool, reopen, reopen + Timeframe::M1.duration_ms()).await;
+            let forming = market_domain::Candle::new(
+                test_symbol(),
+                Timeframe::M1,
+                reopen,
+                reopen + 59_999,
+                canonical_open,
+                canonical_open,
+                canonical_open,
+                canonical_open,
+            )
+            .unwrap();
+            assert!(supervisor.observe_candle_open(&forming));
+            reopen
+        } else {
+            seed_candle(
+                &pool,
+                Timeframe::M1,
+                effective_at,
+                canonical_open,
+                Decimal::new(4116, 0),
+                Decimal::new(4110, 0),
+                Decimal::new(4114, 0),
+            )
+            .await;
+            effective_at
+        };
         process_pending_execution_inputs(
             &mut supervisor,
             &pool,
@@ -1258,7 +1300,7 @@ mod runtime_repair_tests {
         .unwrap();
 
         let row = sqlx::query(
-            "SELECT trade_state, exit_price, result->>'exitReason' AS exit_reason \
+            "SELECT trade_state, exit_time, exit_price, result->>'exitReason' AS exit_reason \
              FROM virtual_trades WHERE virtual_trade_id = $1",
         )
         .bind(virtual_trade_id)
@@ -1272,7 +1314,11 @@ mod runtime_repair_tests {
         );
         assert_eq!(
             row.get::<Option<String>, _>("exit_reason").as_deref(),
-            Some("test close advice")
+            Some(if reverse_at_reopen {
+                "reverse at next open"
+            } else {
+                "test close advice"
+            })
         );
         let consumed: bool = sqlx::query_scalar(
             "SELECT consumed_at IS NOT NULL FROM trade_management_directives WHERE directive_id = $1",
@@ -1282,6 +1328,30 @@ mod runtime_repair_tests {
         .await
         .unwrap();
         assert!(consumed);
+        assert_eq!(row.get::<i64, _>("exit_time"), fill_time);
+        if reverse_at_reopen {
+            let entry: (i64, Decimal, String) = sqlx::query_as("SELECT actual_entry_time, actual_entry_price, trade_state FROM virtual_trades WHERE signal_id=$1")
+                .bind(reverse.signal_id).fetch_one(&pool).await.unwrap();
+            assert_eq!(entry, (fill_time, canonical_open, "OPEN".into()));
+            use analysis_service::PlanFeedbackStore;
+            let successor = analysis_storage::SignalRepository::new(pool.clone())
+                .executed_reverse(signal.signal_id)
+                .await
+                .unwrap();
+            assert_eq!(successor, Some(reverse));
+            assert!(
+                pending_execution_signals(&pool, 100)
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+            assert!(
+                pending_execution_directives(&pool, fill_time, 100)
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+        }
         pool.close().await;
     }
 

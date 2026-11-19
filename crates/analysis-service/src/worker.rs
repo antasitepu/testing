@@ -62,6 +62,16 @@ impl AnalysisWorker {
         };
 
         for profile in profiles {
+            let record = self
+                .work
+                .runtime_state(&profile.key, work.release_id)
+                .await?;
+            if record
+                .as_ref()
+                .is_some_and(|state| state.last_evaluated_close_time >= work.canonical_close_time)
+            {
+                continue;
+            }
             let availability = self.candles.snapshot(&work, &profile).await;
             let mut snapshot = match availability {
                 Ok(SnapshotAvailability::Ready(snapshot)) => snapshot,
@@ -95,10 +105,7 @@ impl AnalysisWorker {
                     reason: ReadinessReason::UnresolvedGap,
                 };
             }
-            let mut state = self
-                .work
-                .runtime_state(&profile.key, work.release_id)
-                .await?
+            let mut state = record
                 .map(|record| {
                     serde_json::from_value(record.state)
                         .map_err(|error| AnalysisServiceError::InvalidData(error.to_string()))
@@ -177,11 +184,24 @@ impl AnalysisWorker {
                 });
                 continue;
             }
-            let feedback = if let Some(signal) = &state.active_signal {
+            let mut feedback = if let Some(signal) = &state.active_signal {
                 self.feedback.pending_feedback(signal.signal_id).await?
             } else {
                 Vec::new()
             };
+            let mut closed_leg_feedback = Vec::new();
+            if let Some(closed_id) = feedback.iter().find_map(|f| match f {
+                analysis_domain::PlanFeedback::TradeClosed {
+                    signal_id, reason, ..
+                } if reason == "reverse" => Some(*signal_id),
+                _ => None,
+            }) && let Some(reverse) = self.feedback.executed_reverse(closed_id).await?
+            {
+                let next_feedback = self.feedback.pending_feedback(reverse.signal_id).await?;
+                state = analysis_plans::reversed_trade_state(&profile, reverse)
+                    .map_err(|e| AnalysisServiceError::InvalidData(e.to_string()))?;
+                closed_leg_feedback = std::mem::replace(&mut feedback, next_feedback);
+            }
             let Some(evaluator) = self.plans.get(profile.key.plan) else {
                 tracing::warn!(
                     work_id = %work.work_id,
@@ -229,6 +249,7 @@ impl AnalysisWorker {
                         })?,
                         last_evaluated_close_time: work.canonical_close_time,
                     });
+                    commit.consumed_feedback.extend(closed_leg_feedback);
                     commit.consumed_feedback.extend(feedback);
                     for rejected in evaluation.rejected_candidates {
                         commit.rejected_candidates.push(RejectedPlanCandidate {

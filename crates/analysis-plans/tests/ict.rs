@@ -65,6 +65,7 @@ fn profile(release_id: Uuid) -> MaterializedProfile {
             sweep_max_bars_valid: 10,
             displacement_max_bars_valid: 5,
             entry_max_bars_valid: 10,
+            setup_age_limits: true,
         }),
         required_timeframes: vec![Timeframe::M5],
         minimum_history_bars: 200,
@@ -923,4 +924,55 @@ fn a_swept_pool_is_not_a_target() {
     assert!(emits(&sell));
     sweep_pools(&mut sell.target.facts);
     assert!(!emits(&sell));
+}
+
+#[test]
+fn without_setup_age_limits_old_setups_still_emit() {
+    // Spec 2026-11-19 ICT age limits, rejected on 30m and 1h: `ict-v4` behaviour.
+    let mut profile = profile(Uuid::now_v7());
+    let PlanParameters::Ict(parameters) = &mut profile.parameters else {
+        panic!("expected ICT parameters");
+    };
+    parameters.setup_age_limits = false;
+    let state = PlanRuntimeState::neutral(&profile);
+    let emits_with = |snapshot: &CanonicalMarketSnapshot| {
+        IctEvaluator
+            .evaluate(&profile, snapshot, &state, &[])
+            .unwrap()
+            .signal
+            .is_some()
+    };
+    // Sweep one past its limit.
+    let past_sweep = 10_000 + 10 * M1_BAR + 1;
+    assert!(emits_with(&snapshot(false, 4_200, past_sweep)));
+    assert!(emits_with(&sell_snapshot(past_sweep)));
+    // Displacement one past its limit after the sweep.
+    let mut late = snapshot(false, 4_200, 59_999);
+    confirm_at(
+        &mut late.target.facts,
+        FactKind::LiquiditySweep,
+        20_000 - 5 * M1_BAR - 1,
+    );
+    assert!(emits_with(&late));
+}
+
+#[test]
+fn without_setup_age_limits_an_old_bias_still_counts() {
+    let mut profile = profile(Uuid::now_v7());
+    let PlanParameters::Ict(parameters) = &mut profile.parameters else {
+        panic!("expected ICT parameters");
+    };
+    parameters.higher_timeframe = None;
+    parameters.setup_age_limits = false;
+    let state = PlanRuntimeState::neutral(&profile);
+    // One target bar past the bias limit of the test above.
+    let mut snapshot = snapshot(false, 4_200, 30_000 + 20 * M1_BAR + 1);
+    snapshot.higher_timeframes.clear();
+    assert!(
+        IctEvaluator
+            .evaluate(&profile, &snapshot, &state, &[])
+            .unwrap()
+            .signal
+            .is_some()
+    );
 }

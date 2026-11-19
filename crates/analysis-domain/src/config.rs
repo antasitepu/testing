@@ -105,6 +105,10 @@ pub struct IctParameters {
     pub sweep_max_bars_valid: i32,
     pub displacement_max_bars_valid: i32,
     pub entry_max_bars_valid: i32,
+    /// Apply the bias, sweep and displacement age limits (`ict-v5`). Off keeps the
+    /// `ict-v4` behaviour on timeframes where the limits were rejected.
+    #[serde(default = "enabled", skip_serializing_if = "is_enabled")]
+    pub setup_age_limits: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -185,6 +189,19 @@ pub struct TrendBreakoutParameters {
     pub trailing_activation_r: Decimal,
     pub chandelier_period: i32,
     pub chandelier_atr_multiplier: Decimal,
+    /// Same-direction re-entry lock (`trend-v5`). Off keeps the `trend-v4` immediate
+    /// re-entry on timeframes where the lock was rejected.
+    #[serde(default = "enabled", skip_serializing_if = "is_enabled")]
+    pub reentry_lock: bool,
+}
+
+fn enabled() -> bool {
+    true
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_enabled(value: &bool) -> bool {
+    *value
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -1677,6 +1677,16 @@ impl TrackerRuntime {
             virtual_trade_write: Some(VirtualTradeWrite {
                 trade: closed.clone(),
             }),
+            tracker_states: vec![TrackerState {
+                signal_id: closed.signal_id,
+                symbol: closed.symbol.clone(),
+                state: json!({
+                    "signalId": closed.signal_id, "tradeState": closed.trade_state,
+                    "virtualTradeId": closed.virtual_trade_id, "reverseSignalId": reverse_signal.signal_id
+                }),
+                tracking_health: TrackingHealth::Live,
+            }],
+            opened_reverse_signals: vec![reverse_signal],
             virtual_trade_writes: vec![VirtualTradeWrite {
                 trade: opened.clone(),
             }],

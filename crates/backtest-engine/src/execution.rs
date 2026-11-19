@@ -340,12 +340,12 @@ impl ExecutionAdapter for OhlcConservativeExecution {
         let Some(mut position) = self.position.clone() else {
             return Vec::new();
         };
+        let market_candle = candle;
         let quote = self.spread.exit_candle(candle, position.direction);
         let candle = &quote;
-        for directive in directives
-            .iter()
-            .filter(|directive| directive.effective_at <= candle.open_time)
-        {
+        for directive in directives.iter().filter(|directive| {
+            directive.signal_id == position.signal_id && directive.effective_at <= candle.open_time
+        }) {
             match directive.kind {
                 DirectiveKind::MoveStop => {
                     if let Some(price) = directive.price {
@@ -391,13 +391,24 @@ impl ExecutionAdapter for OhlcConservativeExecution {
                 }
                 DirectiveKind::ReverseAtNextOpen => {
                     self.position = None;
-                    return vec![Self::execution(
+                    let mut steps = vec![Self::execution(
                         position.signal_id,
                         candle,
                         candle.open,
                         ExecutionKind::ReverseExit,
                         false,
                     )];
+                    if let Some(signal) = &directive.reverse_signal {
+                        for mut step in self.on_signal(signal, market_candle) {
+                            if step.kind == ExecutionKind::Entry {
+                                step.kind = ExecutionKind::ReverseEntry;
+                            }
+                            steps.push(step);
+                        }
+                        // The opposite position is exposed from this same open.
+                        steps.extend(self.on_candle(market_candle, &[]));
+                    }
+                    return steps;
                 }
                 DirectiveKind::CancelEntry | DirectiveKind::ExpireEntry => {}
             }

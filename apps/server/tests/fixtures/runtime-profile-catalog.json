@@ -133,7 +133,7 @@
     "timeframe": "30m",
     "enabled": true,
     "algorithmVersion": "ICT-runtime-v8",
-    "parameterVersion": "ICT-30m-runtime-v3-pp1-pc1",
+    "parameterVersion": "ICT-30m-runtime-v4-pp1-pc1",
     "parameters": {
       "kind": "ICT",
       "parameters": {
@@ -145,6 +145,7 @@
         "fvgSelection": "NEAREST_AFTER_DISPLACEMENT",
         "higherTimeframe": "1h",
         "minimumRr": "1",
+        "setupAgeLimits": false,
         "sweepBiasMode": "OPPOSITE_BIAS",
         "sweepMaxBarsValid": 10
       }
@@ -176,7 +177,7 @@
     "timeframe": "1h",
     "enabled": true,
     "algorithmVersion": "ICT-runtime-v8",
-    "parameterVersion": "ICT-1h-runtime-v2-pp1-pc1",
+    "parameterVersion": "ICT-1h-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "ICT",
       "parameters": {
@@ -188,6 +189,7 @@
         "fvgSelection": "NEAREST_AFTER_DISPLACEMENT",
         "higherTimeframe": "4h",
         "minimumRr": "0.8",
+        "setupAgeLimits": false,
         "sweepBiasMode": "OPPOSITE_BIAS",
         "sweepMaxBarsValid": 10
       }
@@ -1172,7 +1174,7 @@
     "timeframe": "1m",
     "enabled": true,
     "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
-    "parameterVersion": "TREND_BREAKOUT-1m-runtime-v2-pp1-pc1",
+    "parameterVersion": "TREND_BREAKOUT-1m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
       "parameters": {
@@ -1185,6 +1187,7 @@
         "higherTimeframe": "5m",
         "initialStopAtrMultiplier": "2",
         "minimumAdx": "20",
+        "reentryLock": false,
         "targetRr": "2",
         "trailingActivationR": "0.75"
       }
@@ -1216,7 +1219,7 @@
     "timeframe": "5m",
     "enabled": true,
     "algorithmVersion": "TREND_BREAKOUT-runtime-v5",
-    "parameterVersion": "TREND_BREAKOUT-5m-runtime-v2-pp1-pc1",
+    "parameterVersion": "TREND_BREAKOUT-5m-runtime-v3-pp1-pc1",
     "parameters": {
       "kind": "TREND_BREAKOUT",
       "parameters": {
@@ -1229,6 +1232,7 @@
         "higherTimeframe": "15m",
         "initialStopAtrMultiplier": "1.5",
         "minimumAdx": "20",
+        "reentryLock": false,
         "targetRr": "1.5",
         "trailingActivationR": "0.75"
       }

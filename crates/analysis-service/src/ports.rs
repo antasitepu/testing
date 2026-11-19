@@ -109,6 +109,12 @@ pub struct EvaluationCommit {
 
 #[async_trait]
 pub trait PlanFeedbackStore: Send + Sync {
+    async fn executed_reverse(
+        &self,
+        _closed_signal_id: Uuid,
+    ) -> Result<Option<SignalDefinition>, AnalysisServiceError> {
+        Ok(None)
+    }
     async fn pending_feedback(
         &self,
         signal_id: Uuid,

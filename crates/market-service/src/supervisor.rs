@@ -46,6 +46,7 @@ impl StreamSupervisor {
         mut shutdown: watch::Receiver<bool>,
     ) -> Result<(), ServiceError> {
         let mut reconnect_attempt = 0;
+        let mut restore_status = None;
         loop {
             if *shutdown.borrow() {
                 return Ok(());
@@ -55,7 +56,7 @@ impl StreamSupervisor {
                 Err(error) => {
                     record_market_reconnect();
                     tracing::warn!(symbol = %symbol, error = %error, "websocket connect failed");
-                    self.handle_disconnect(&symbol).await;
+                    self.handle_disconnect(&symbol, &mut restore_status).await;
                     if wait_or_shutdown(reconnect_delay(reconnect_attempt), &mut shutdown).await {
                         return Ok(());
                     }
@@ -63,7 +64,7 @@ impl StreamSupervisor {
                     continue;
                 }
             };
-            self.reconcile_after_connect(&symbol).await;
+            self.reconcile_connected(&symbol, &mut restore_status).await;
 
             loop {
                 tokio::select! {
@@ -78,7 +79,7 @@ impl StreamSupervisor {
                                 // A storage failure must not end ingestion: drop the
                                 // stream and let disconnect reconciliation repair the
                                 // closed candles that were not persisted.
-                                if let Err(error) = self.process_event(&symbol, event).await {
+                                if let Err(error) = self.process_event(&symbol, event, &mut restore_status).await {
                                     tracing::warn!(symbol = %symbol, error = %error, "market event processing failed");
                                     break;
                                 }
@@ -95,7 +96,7 @@ impl StreamSupervisor {
             }
 
             record_market_reconnect();
-            self.handle_disconnect(&symbol).await;
+            self.handle_disconnect(&symbol, &mut restore_status).await;
             if wait_or_shutdown(reconnect_delay(reconnect_attempt), &mut shutdown).await {
                 return Ok(());
             }
@@ -103,7 +104,12 @@ impl StreamSupervisor {
         }
     }
 
-    async fn process_event(&self, symbol: &Symbol, event: MarketEvent) -> Result<(), ServiceError> {
+    async fn process_event(
+        &self,
+        symbol: &Symbol,
+        event: MarketEvent,
+        restore: &mut Option<LiveStatus>,
+    ) -> Result<(), ServiceError> {
         match event {
             MarketEvent::FormingCandle(candle) => {
                 self.hub.apply_forming(candle).await;
@@ -118,38 +124,24 @@ impl StreamSupervisor {
                 self.hub.apply_closed(candle).await;
             }
             MarketEvent::AggregateTrade(trade) => {
-                let previous = self
-                    .hub
-                    .snapshot(&trade.symbol, Timeframe::M1)
-                    .await
-                    .latest_trade;
-                let prior_status = self.hub.snapshot(&trade.symbol, Timeframe::M1).await.status;
-                let sequence_gap = previous.as_ref().is_some_and(|previous| {
-                    trade.aggregate_trade_id > previous.aggregate_trade_id + 1
+                let snapshot = self.hub.snapshot(&trade.symbol, Timeframe::M1).await;
+                let sequence_gap = snapshot.latest_trade.is_some_and(|previous| {
+                    trade
+                        .aggregate_trade_id
+                        .saturating_sub(previous.aggregate_trade_id)
+                        > 1
                 });
+                if sequence_gap
+                    && matches!(
+                        snapshot.status,
+                        LiveStatus::Ready | LiveStatus::MarketClosed
+                    )
+                {
+                    *restore = Some(snapshot.status);
+                }
                 self.hub.apply_trade(trade).await;
                 if sequence_gap {
-                    // Match disconnect semantics: degrade until reconcile succeeds.
-                    self.hub.set_status(symbol, LiveStatus::Degraded).await;
-                    match self.reconciler.reconcile_to_server_time(symbol).await {
-                        Ok(reports)
-                            if fully_resolved(&reports)
-                                && matches!(
-                                    prior_status,
-                                    LiveStatus::Ready | LiveStatus::MarketClosed
-                                ) =>
-                        {
-                            self.hub.set_status(symbol, prior_status).await;
-                        }
-                        Ok(reports) => log_unresolved(symbol, &reports),
-                        Err(error) => {
-                            tracing::warn!(
-                                symbol = %symbol,
-                                error = %error,
-                                "sequence gap reconciliation failed"
-                            );
-                        }
-                    }
+                    self.reconcile_connected(symbol, restore).await;
                 }
             }
             MarketEvent::SessionChanged(session) => {
@@ -163,37 +155,51 @@ impl StreamSupervisor {
             }
             MarketEvent::ResyncRequired { .. } => {
                 record_market_resync();
-                self.handle_disconnect(symbol).await;
+                self.mark_disconnected(symbol, restore).await;
+                self.reconcile_connected(symbol, restore).await;
             }
         }
         record_activity(ActivityKind::Market, current_unix_millis());
         Ok(())
     }
 
-    /// A candle that closed before this subscription went live produces no stream
-    /// event, so repair anything missed since the previous sync.
-    async fn reconcile_after_connect(&self, symbol: &Symbol) {
-        match self.reconciler.reconcile_to_server_time(symbol).await {
-            Ok(reports) => log_unresolved(symbol, &reports),
-            Err(error) => {
-                tracing::warn!(symbol = %symbol, error = %error, "post-connect reconciliation failed");
+    async fn mark_disconnected(&self, symbol: &Symbol, restore: &mut Option<LiveStatus>) {
+        let status = self.hub.snapshot(symbol, Timeframe::M1).await.status;
+        if matches!(status, LiveStatus::Ready | LiveStatus::MarketClosed) {
+            *restore = Some(status);
+        }
+        self.hub.set_status(symbol, LiveStatus::Degraded).await;
+    }
+
+    async fn handle_disconnect(&self, symbol: &Symbol, restore: &mut Option<LiveStatus>) {
+        self.mark_disconnected(symbol, restore).await;
+        // REST can repair candles during a socket outage, but only a connected feed can be ready.
+        self.reconcile(symbol).await;
+    }
+
+    async fn reconcile_connected(&self, symbol: &Symbol, restore: &mut Option<LiveStatus>) {
+        let status = self.hub.snapshot(symbol, Timeframe::M1).await.status;
+        if self.reconcile(symbol).await {
+            if let Some(previous) = restore.take() {
+                self.hub.set_status(symbol, previous).await;
             }
+        } else {
+            if matches!(status, LiveStatus::Ready | LiveStatus::MarketClosed) {
+                *restore = Some(status);
+            }
+            self.hub.set_status(symbol, LiveStatus::Degraded).await;
         }
     }
 
-    async fn handle_disconnect(&self, symbol: &Symbol) {
-        let prior_status = self.hub.snapshot(symbol, Timeframe::M1).await.status;
-        self.hub.set_status(symbol, LiveStatus::Degraded).await;
+    async fn reconcile(&self, symbol: &Symbol) -> bool {
         match self.reconciler.reconcile_to_server_time(symbol).await {
-            Ok(reports)
-                if fully_resolved(&reports)
-                    && matches!(prior_status, LiveStatus::Ready | LiveStatus::MarketClosed) =>
-            {
-                self.hub.set_status(symbol, prior_status).await;
+            Ok(reports) => {
+                log_unresolved(symbol, &reports);
+                fully_resolved(&reports)
             }
-            Ok(reports) => log_unresolved(symbol, &reports),
             Err(error) => {
-                tracing::warn!(symbol = %symbol, error = %error, "disconnect reconciliation failed");
+                tracing::warn!(%symbol, %error, "market reconciliation failed");
+                false
             }
         }
     }

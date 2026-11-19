@@ -17,6 +17,7 @@ pub struct ExecutionSupervisor {
     tracker_store: Arc<dyn TrackerStore>,
     health: HashMap<Symbol, TrackingHealth>,
     claimed_symbols: HashSet<Symbol>,
+    latest_opens: HashMap<(Symbol, Timeframe), (i64, Decimal)>,
     last_seen_cursor: Option<MarketCursor>,
     last_checkpointed_cursor: Option<MarketCursor>,
     cancelled: bool,
@@ -35,10 +36,32 @@ impl ExecutionSupervisor {
             tracker_store,
             health: HashMap::new(),
             claimed_symbols: HashSet::new(),
+            latest_opens: HashMap::new(),
             last_seen_cursor: None,
             last_checkpointed_cursor: None,
             cancelled: false,
         }
+    }
+
+    pub fn observe_candle_open(&mut self, candle: &Candle) -> bool {
+        let key = (candle.symbol.clone(), candle.timeframe);
+        if self
+            .latest_opens
+            .get(&key)
+            .is_some_and(|(time, _)| *time >= candle.open_time)
+        {
+            return false;
+        }
+        self.latest_opens
+            .insert(key, (candle.open_time, candle.open));
+        true
+    }
+
+    pub fn candle_open(&self, symbol: &Symbol, timeframe: Timeframe, time: i64) -> Option<Decimal> {
+        self.latest_opens
+            .get(&(symbol.clone(), timeframe))
+            .filter(|(open_time, _)| *open_time == time)
+            .map(|(_, price)| *price)
     }
 
     pub fn claim_symbol(&mut self, symbol: Symbol) -> bool {
